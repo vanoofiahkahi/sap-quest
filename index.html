@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sap Quest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Layout idea: an 8-bit arcade cabinet. Two team panels on top, a 5x5 pixel question board below, overlays for questions. */
+  --bg:#12132b;
+  --panel:#22305e;
+  --ink:#f4f0e2;
+  --leaf:#3ccf4e;
+  --xylem:#3fa9f5;
+  --phloem:#ffb020;
+  --bad:#ff4d5e;
+  --mute:#8a8fb3;
+  --shadow:#05060f;
+  --font-display:"Press Start 2P", "Courier New", monospace;
+  --font-body:"VT323", "Courier New", monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--font-body);
+  font-size:24px;
+  line-height:1.2;
+  -webkit-font-smoothing:none;
+}
+body::after{ /* CRT scanlines */
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:50;
+  background:repeating-linear-gradient(to bottom,rgba(0,0,0,0) 0 2px,rgba(0,0,0,.18) 2px 4px);
+}
+#app{min-height:100%;max-width:1100px;margin:0 auto;padding:16px}
+.screen{display:none}
+.screen.active{display:flex;flex-direction:column;gap:16px}
+h1,h2,h3{font-family:var(--font-display);font-weight:400;margin:0;text-wrap:balance;letter-spacing:1px}
+.px{border:4px solid var(--ink);box-shadow:6px 6px 0 var(--shadow)}
+
+button{
+  font-family:var(--font-display);font-size:14px;color:var(--bg);background:var(--ink);
+  border:4px solid var(--shadow);box-shadow:4px 4px 0 var(--shadow);
+  padding:12px 16px;cursor:pointer;text-transform:uppercase;
+}
+button:hover{filter:brightness(1.12)}
+button:active{transform:translate(4px,4px);box-shadow:0 0 0 var(--shadow)}
+button:focus-visible,input:focus-visible{outline:4px dashed var(--phloem);outline-offset:3px}
+button:disabled{cursor:default}
+.btn-go{background:var(--leaf)}
+.btn-small{font-size:10px;padding:8px 10px;background:var(--panel);color:var(--ink);border-color:var(--ink)}
+
+/* ---------- Title ---------- */
+#screen-title{align-items:center;text-align:center;padding-top:8px}
+.logo{font-size:clamp(26px,7vw,56px);color:var(--leaf);text-shadow:4px 4px 0 var(--shadow),-2px -2px 0 #1b6b26}
+.logo span{color:var(--xylem)}
+.tag{font-family:var(--font-display);font-size:clamp(9px,2vw,13px);color:var(--phloem)}
+#plant{width:192px;height:240px;image-rendering:pixelated;background:var(--bg)}
+.setup{background:var(--panel);padding:20px;display:grid;gap:16px;width:min(640px,100%);text-align:left}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label,.legend{font-family:var(--font-display);font-size:10px}
+input[type=text]{
+  font-family:var(--font-body);font-size:24px;padding:4px 8px;background:var(--bg);color:var(--ink);
+  border:4px solid var(--ink);width:100%;text-transform:uppercase;min-width:0
+}
+.countrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.countrow output{font-family:var(--font-display);font-size:20px;min-width:3ch;text-align:center;color:var(--phloem)}
+.teamlist{display:grid;gap:8px;max-height:44vh;overflow:auto;padding:4px 6px 4px 0}
+.trow{display:grid;grid-template-columns:22px 1.3fr 1fr 1fr;gap:8px;align-items:center}
+.trow.head{font-family:var(--font-display);font-size:8px;color:var(--mute)}
+.sw{width:22px;height:22px;border:3px solid var(--shadow);background:var(--tc)}
+.clockpick{display:flex;gap:10px;flex-wrap:wrap}
+.clockpick input{position:absolute;opacity:0;width:1px;height:1px}
+.clockpick label{font-family:var(--font-display);font-size:11px;padding:10px 12px;border:4px solid var(--ink);cursor:pointer}
+.clockpick input:checked+label{background:var(--leaf);color:var(--bg)}
+.clockpick input:focus-visible+label{outline:4px dashed var(--phloem);outline-offset:3px}
+.how{width:min(640px,100%);text-align:left;font-size:22px;margin:0;padding:16px 20px 16px 36px;background:var(--shadow)}
+.how li{margin:4px 0}
+.how b{color:var(--phloem);font-weight:400}
+
+/* ---------- HUD ---------- */
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.topbar .logo{font-size:clamp(14px,3vw,22px)}
+.controls{display:flex;gap:8px;flex-wrap:wrap}
+.scoreboard{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.team{background:var(--panel);padding:8px 10px;display:flex;flex-direction:column;gap:4px;border:4px solid var(--mute);border-left:10px solid var(--tc)}
+.team .name{font-family:var(--font-display);font-size:10px;line-height:1.4;overflow-wrap:anywhere;color:var(--tc)}
+.team .players{font-size:19px;color:var(--mute);overflow-wrap:anywhere}
+.team .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.team .score{font-family:var(--font-display);font-size:16px;font-variant-numeric:tabular-nums;color:var(--tc)}
+.team .clock{font-family:var(--font-display);font-size:11px;font-variant-numeric:tabular-nums;color:var(--ink)}
+.team .flag{font-family:var(--font-display);font-size:8px;min-height:8px;color:var(--mute)}
+.team.active{border-color:var(--tc);box-shadow:0 0 0 3px var(--shadow),0 0 0 7px var(--tc)}
+.team.active .flag{color:var(--leaf);animation:blink 1s steps(2) infinite}
+.team.low .clock{color:var(--bad)}
+.team.out{opacity:.5}
+.team.out .flag{color:var(--bad)}
+@keyframes blink{50%{opacity:0}}
+
+/* ---------- Board ---------- */
+.board{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.cat{
+  font-family:var(--font-display);font-size:clamp(7px,1.3vw,11px);line-height:1.5;text-align:center;
+  background:var(--leaf);color:var(--bg);padding:10px 4px;display:flex;align-items:center;justify-content:center;
+  min-height:64px;border:4px solid var(--shadow);overflow-wrap:anywhere
+}
+.cell{
+  font-size:clamp(12px,2.6vw,24px);background:var(--panel);color:var(--phloem);border-color:var(--shadow);
+  min-height:clamp(52px,9vw,80px);padding:4px;text-shadow:3px 3px 0 var(--shadow)
+}
+.cell:disabled{background:var(--shadow);color:var(--mute);box-shadow:none;transform:none;text-shadow:none;font-size:clamp(8px,1.4vw,12px);filter:none}
+.cell.won{color:var(--tc)}
+.steal{display:flex;flex-direction:column;gap:12px;background:var(--shadow);padding:14px 16px;border-left:8px solid var(--phloem)}
+.steal[hidden]{display:none}
+.steal h3{font-size:14px;color:var(--phloem)}
+.steal p{margin:0}
+.stealbtns{display:flex;flex-wrap:wrap;gap:8px}
+.stealbtns button{font-size:10px;padding:8px 10px;background:var(--tc)}
+.stealbtns .nosteal{background:var(--mute)}
+.turnline{font-family:var(--font-display);font-size:clamp(9px,1.8vw,13px);text-align:center;min-height:1.5em}
+
+/* ---------- Overlays ---------- */
+.overlay{position:fixed;inset:0;background:rgba(5,6,15,.92);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20;overflow:auto}
+.overlay[hidden]{display:none}
+.qbox{background:var(--panel);width:min(860px,100%);padding:20px;display:flex;flex-direction:column;gap:16px}
+.qhead{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-family:var(--font-display);font-size:11px}
+.qhead .qcat{color:var(--leaf)} .qhead .qval{color:var(--phloem)}
+.qteam{font-family:var(--font-display);font-size:11px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.qclock{font-variant-numeric:tabular-nums}
+.qclock.low{color:var(--bad);animation:blink .5s steps(2) infinite}
+.qtext{font-size:clamp(26px,3.4vw,34px);line-height:1.15;margin:0}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.opt{
+  font-family:var(--font-body);font-size:clamp(22px,2.6vw,28px);text-transform:none;text-align:left;
+  background:var(--bg);color:var(--ink);border-color:var(--ink);display:flex;gap:12px;align-items:flex-start;line-height:1.1
+}
+.opt .k{font-family:var(--font-display);font-size:12px;color:var(--phloem);padding-top:4px;flex:none}
+.opt.right{background:var(--leaf);color:var(--bg)} .opt.right .k{color:var(--bg)}
+.opt.wrong{background:var(--bad);color:var(--bg)} .opt.wrong .k{color:var(--bg)}
+.opt:disabled:not(.right):not(.wrong){opacity:.45}
+.feedback{display:flex;flex-direction:column;gap:12px;background:var(--shadow);padding:14px 16px;border-left:8px solid var(--leaf)}
+.feedback[hidden]{display:none}
+.feedback.bad{border-left-color:var(--bad)}
+.feedback h3{font-size:16px}
+.feedback.good h3{color:var(--leaf)} .feedback.bad h3{color:var(--bad)}
+.feedback p{margin:0;font-size:26px}
+.feedback button{align-self:flex-end}
+.center{text-align:center;align-items:center}
+#screen-end{align-items:center;text-align:center;padding-top:24px}
+.trophy{width:160px;height:160px;image-rendering:pixelated}
+.final{display:grid;gap:8px;width:min(640px,100%);margin:0;padding:0;list-style:none}
+.final li{display:grid;grid-template-columns:3ch 1fr auto;gap:12px;align-items:center;background:var(--panel);padding:8px 12px;border-left:10px solid var(--tc);text-align:left}
+.final .pos{font-family:var(--font-display);font-size:12px;color:var(--mute)}
+.final .nm{font-family:var(--font-display);font-size:11px;color:var(--tc);line-height:1.5}
+.final .nm small{display:block;font-family:var(--font-body);font-size:20px;color:var(--mute)}
+.final .pts{font-family:var(--font-display);font-size:14px;font-variant-numeric:tabular-nums}
+.final li:first-child{box-shadow:0 0 0 3px var(--shadow),0 0 0 6px #ffd23f}
+.toast{position:fixed;left:50%;top:16px;transform:translateX(-50%);background:var(--bad);color:var(--bg);font-family:var(--font-display);font-size:12px;padding:12px 16px;z-index:40;border:4px solid var(--shadow)}
+.toast[hidden]{display:none}
+
+@media (max-width:640px){
+  body{font-size:22px}
+  .opts{grid-template-columns:1fr}
+  .trow{grid-template-columns:22px 1fr 1fr}
+  .trow .tname{grid-column:2/-1}
+  .trow.head{display:none}
+  .scoreboard{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+  .board{gap:4px}
+  .cat{min-height:56px;padding:6px 2px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none !important}
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- TITLE -->
+  <section id="screen-title" class="screen active">
+    <h1 class="logo">SAP <span>QUEST</span></h1>
+    <p class="tag">PLANT TRANSPORT TRIVIA &middot; TEAMS OF 2</p>
+    <canvas id="plant" width="32" height="40" aria-label="Pixel plant with water rising up the xylem and sugar moving down the phloem"></canvas>
+    <form id="setup" class="setup px" autocomplete="off">
+      <div class="field">
+        <span class="legend">NUMBER OF TEAMS (2-15)</span>
+        <div class="countrow">
+          <button type="button" class="btn-small" id="minusBtn" aria-label="Fewer teams">&minus;</button>
+          <output id="teamCount" aria-live="polite">4</output>
+          <button type="button" class="btn-small" id="plusBtn" aria-label="More teams">+</button>
+        </div>
+      </div>
+      <div class="teamlist" id="teamlist"></div>
+      <div class="field">
+        <span class="legend">TIME FOR EACH TEAM</span>
+        <div class="clockpick" role="radiogroup" aria-label="Time for each team">
+          <input type="radio" name="clock" id="clk3" value="180"><label for="clk3">3 MIN</label>
+          <input type="radio" name="clock" id="clk5" value="300" checked><label for="clk5">5 MIN</label>
+          <input type="radio" name="clock" id="clk8" value="480"><label for="clk8">8 MIN</label>
+        </div>
+      </div>
+      <div class="field">
+        <span class="legend">ROUNDS</span>
+        <div class="clockpick" role="radiogroup" aria-label="Number of rounds">
+          <input type="radio" name="rounds" id="rnd1" value="1"><label for="rnd1">1 ROUND (25 Q)</label>
+          <input type="radio" name="rounds" id="rnd2" value="2" checked><label for="rnd2">2 ROUNDS (50 Q)</label>
+        </div>
+      </div>
+      <button type="submit" class="btn-go" id="startBtn">&#9654; PRESS START</button>
+    </form>
+    <ol class="how">
+      <li>Each team has <b>2 players</b>. Teams take turns picking a <b>topic</b> and a <b>point value</b>.</li>
+      <li>Bigger points = <b>harder questions</b>. 100 is easy, 500 is a boss level.</li>
+      <li>Wrong answer? Another team can <b>STEAL</b> the question and win the points.</li>
+      <li>Each team has its <b>own clock</b>. It only runs while that team is picking or answering.</li>
+      <li>If your clock hits 0:00 you are out. Everyone else keeps playing.</li>
+      <li>Answer with a click or press keys <b>1-4</b>. Most points wins!</li>
+    </ol>
+  </section>
+
+  <!-- GAME -->
+  <section id="screen-game" class="screen">
+    <header class="topbar">
+      <h2 class="logo">SAP <span>QUEST</span></h2>
+      <div class="controls">
+        <button type="button" class="btn-small" id="pauseBtn">PAUSE</button>
+        <button type="button" class="btn-small" id="musicBtn" aria-pressed="true">MUSIC ON</button>
+        <button type="button" class="btn-small" id="sfxBtn" aria-pressed="true">SFX ON</button>
+      </div>
+    </header>
+    <div class="scoreboard" id="scoreboard"></div>
+    <p class="turnline" id="turnline"></p>
+    <div class="board" id="board" role="grid" aria-label="Question board"></div>
+  </section>
+
+  <!-- END -->
+  <section id="screen-end" class="screen">
+    <h2 class="logo" id="winTitle">GAME OVER</h2>
+    <canvas class="trophy" id="trophy" width="16" height="16" aria-hidden="true"></canvas>
+    <p class="tag" id="winSub"></p>
+    <ol class="final" id="final"></ol>
+    <button type="button" class="btn-go" id="againBtn">&#9654; PLAY AGAIN</button>
+  </section>
+</div>
+
+<!-- QUESTION -->
+<div class="overlay" id="qmodal" hidden role="dialog" aria-modal="true" aria-labelledby="qtext">
+  <div class="qbox px">
+    <div class="qhead"><span class="qcat" id="qcat"></span><span class="qval" id="qval"></span></div>
+    <div class="qteam"><span id="qteam"></span><span class="qclock" id="qclock"></span></div>
+    <p class="qtext" id="qtext"></p>
+    <div class="opts" id="opts"></div>
+    <div class="steal" id="steal" hidden aria-live="polite">
+      <h3 id="stealTitle">WRONG! STEAL CHANCE!</h3>
+      <p>Which team wants to steal? Their own clock runs while they answer.</p>
+      <div class="stealbtns" id="stealbtns"></div>
+    </div>
+    <div class="feedback" id="feedback" hidden aria-live="polite">
+      <h3 id="fbTitle"></h3>
+      <p id="fbText"></p>
+      <button type="button" class="btn-go" id="nextBtn">NEXT TURN &#9654;</button>
+    </div>
+  </div>
+</div>
+
+<!-- PAUSE -->
+<div class="overlay" id="pauseModal" hidden role="dialog" aria-modal="true" aria-labelledby="pauseTitle">
+  <div class="qbox px center">
+    <h2 id="pauseTitle" class="logo">PAUSED</h2>
+    <p>Both clocks are stopped.</p>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+      <button type="button" class="btn-go" id="resumeBtn">RESUME</button>
+      <button type="button" id="quitBtn">END GAME NOW</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script>
+/* ================= QUESTIONS =================
+   5 topics x 5 levels, 2 questions per slot (one is picked at random each game).
+   a[0] is always the correct answer; options are shuffled at run time. */
+const TOPICS = [
+ { name:"ROOTS & WATER UPTAKE", levels:[
+  [ {q:"Which cells in the root are specially shaped to absorb water from the soil?", a:["Root hair cells","Guard cells","Palisade cells","Red blood cells"], e:"Root hair cells have long, thin extensions that reach between soil particles to absorb water."},
+    {q:"Which part of a plant takes in most of its water?", a:["The roots","The flowers","The leaves","The seeds"], e:"Water enters through the roots, mainly through root hair cells."} ],
+  [ {q:"By which process does water move from the soil into root hair cells?", a:["Osmosis","Photosynthesis","Respiration","Translocation"], e:"Water moves into root hair cells by osmosis, through the partially permeable cell membrane."},
+    {q:"Why do root hair cells have a long, thin shape?", a:["To give a large surface area for absorbing water","To store lots of starch","To carry out photosynthesis","To make the root heavier"], e:"A bigger surface area means more water and minerals can be absorbed at once."} ],
+  [ {q:"Root hair cells often take in minerals by active transport. What does active transport need?", a:["Energy from respiration","Sunlight","Carbon dioxide","Chlorophyll"], e:"Active transport moves minerals against a concentration gradient, so it needs energy released by respiration."},
+    {q:"Why do root hair cells NOT have chloroplasts?", a:["They are underground, so there is no light for photosynthesis","They are dead cells","Chloroplasts would block the water","Roots are too cold for chloroplasts"], e:"No light reaches roots underground, so chloroplasts would be useless there."} ],
+  [ {q:"Water moves INTO a root hair cell by osmosis. What must be true?", a:["The soil water is more dilute than the cell sap","The cell sap is more dilute than the soil water","Both have exactly the same concentration","The soil contains lots of sugar"], e:"Water moves by osmosis from a dilute solution (soil water) to a more concentrated one (cell sap)."},
+    {q:"Root hair cells contain many mitochondria. Why?", a:["To release energy for active transport of minerals","To make glucose","To store water","To absorb light"], e:"Mitochondria carry out respiration, which releases the energy needed for active transport."} ],
+  [ {q:"A farmer adds far too much fertiliser, so the soil water becomes very concentrated. What happens to the plants?", a:["Water leaves the root cells by osmosis and the plants wilt","The plants absorb water faster than before","Nothing happens to the plants","Minerals enter the roots by osmosis"], e:"If the soil water is more concentrated than the cell sap, water moves OUT of the roots by osmosis, so the plant wilts."},
+    {q:"Which is the correct path that water takes through a plant?", a:["Soil, root hair cell, root cortex, xylem, leaf","Soil, xylem, root hair cell, phloem, leaf","Soil, phloem, root cortex, stomata, leaf","Soil, stomata, xylem, root hair cell, leaf"], e:"Water enters root hair cells, crosses the cortex cells, enters the xylem and travels up to the leaves."} ] ]},
+
+ { name:"XYLEM", levels:[
+  [ {q:"What does xylem transport?", a:["Water and minerals","Sugars","Blood","Oxygen only"], e:"Xylem carries water and dissolved mineral ions from the roots to the rest of the plant."},
+    {q:"In which direction does water move in the xylem?", a:["Upwards, from roots to leaves","Downwards, from leaves to roots","Round and round in a circle","Sideways only"], e:"Water in xylem travels one way: up from the roots to the stem and leaves."} ],
+  [ {q:"Xylem vessels are made from cells that are...", a:["Dead","Full of chloroplasts","Alive with a large nucleus","Packed with sugar"], e:"Mature xylem cells are dead and hollow, which leaves an open tube for water."},
+    {q:"Which substance makes xylem walls strong and waterproof?", a:["Lignin","Starch","Chlorophyll","Glucose"], e:"Lignin thickens and strengthens xylem walls so they do not collapse."} ],
+  [ {q:"Why do xylem vessels have no end walls between their cells?", a:["To make a continuous hollow tube so water flows easily","To let sugar in","To trap air bubbles","To make the stem bendy"], e:"With no end walls, the cells join into one long open pipe."},
+    {q:"Apart from transport, what other job does xylem do?", a:["It helps support the plant and hold it upright","It makes food","It produces seeds","It absorbs sunlight"], e:"The tough lignified walls of xylem help support stems, like a skeleton."} ],
+  [ {q:"A celery stick stands in red dye for a day. The cut stem shows red dots. Which tissue are the dots?", a:["Xylem","Phloem","Epidermis","Stomata"], e:"The dye travels up with the water, and water travels in the xylem."},
+    {q:"In the stem of a typical flowering plant, where is the xylem found in each vascular bundle?", a:["On the inside, with phloem on the outside","On the outside, with phloem on the inside","Only in the leaves","Mixed into the epidermis"], e:"In a stem's vascular bundles, xylem is towards the centre and phloem is towards the outside."} ],
+  [ {q:"What mainly pulls water up the xylem of a very tall tree?", a:["Transpiration pull, as water evaporates from the leaves","Gravity","A pump in the roots like a heart","The phloem pushing it"], e:"As water evaporates from leaves, it pulls the whole column of water up the xylem."},
+    {q:"Water molecules stick to each other, making an unbroken column in the xylem. What is this called?", a:["Cohesion","Osmosis","Diffusion","Translocation"], e:"Cohesion means water molecules are attracted to each other, so the column can be pulled up without breaking."} ] ]},
+
+ { name:"PHLOEM", levels:[
+  [ {q:"What does phloem transport?", a:["Sugars (food) made in the leaves","Only water","Minerals from the soil","Carbon dioxide"], e:"Phloem carries dissolved sugars made by photosynthesis to other parts of the plant."},
+    {q:"Where is most of the sugar made before the phloem carries it?", a:["In the leaves, by photosynthesis","In the roots","In the xylem","In the soil"], e:"Leaves make glucose by photosynthesis, then it is moved around the plant as sucrose."} ],
+  [ {q:"What is the name for the movement of sugars through the phloem?", a:["Translocation","Transpiration","Osmosis","Evaporation"], e:"Translocation is the transport of dissolved sugars (and amino acids) in the phloem."},
+    {q:"In which form is sugar mainly carried in the phloem?", a:["Sucrose","Starch","Protein","Fat"], e:"Glucose is turned into sucrose, which dissolves well and is carried in the phloem sap."} ],
+  [ {q:"How is phloem transport different from xylem transport?", a:["Phloem can carry substances both up and down","Phloem only carries things upwards","Phloem only works at night","Phloem is only found in roots"], e:"Phloem moves sugars wherever they are needed, so it can go both up and down the plant."},
+    {q:"Phloem tubes are made of living cells called...", a:["Sieve tubes","Guard cells","Root hair cells","Xylem vessels"], e:"Sieve tubes are living cells joined end to end, helped by companion cells."} ],
+  [ {q:"The end walls of phloem cells have small holes in them. What are these called?", a:["Sieve plates","Stomata","Lenticels","Root hairs"], e:"Sieve plates have pores that let the sugary sap flow from one sieve tube cell to the next."},
+    {q:"Aphids are insects that drink sugary sap. Which tissue do they push their mouthparts into?", a:["Phloem","Xylem","Epidermis","Root hairs"], e:"Phloem sap is rich in sugar, so aphids tap straight into it."} ],
+  [ {q:"A ring of bark (including the phloem) is removed from a tree trunk. Weeks later the bark just ABOVE the ring swells. Why?", a:["Sugars moving down from the leaves build up above the cut","Water builds up because the xylem is blocked","Minerals from the roots collect there","The tree grows faster to repair the cut"], e:"Removing the phloem stops sugars travelling down, so they collect above the ring."},
+    {q:"In spring, sugar from a potato's stored starch travels up to the new shoots. What does this show about phloem?", a:["It moves sugar from where it is stored to where it is needed","It always moves sugar from leaves to roots","It only carries water in spring","It only works in the dark"], e:"Phloem carries sugar from a source (here, the stored food) to a sink (the growing shoots)."} ] ]},
+
+ { name:"TRANSPIRATION", levels:[
+  [ {q:"What is transpiration?", a:["The loss of water vapour from the leaves","Making food from light","Taking in carbon dioxide","Growing new roots"], e:"Transpiration is water evaporating from the leaves and escaping as water vapour."},
+    {q:"What are the tiny holes in a leaf that let water vapour escape?", a:["Stomata","Root hairs","Veins","Xylem"], e:"Stomata (one is called a stoma) are pores, mostly on the underside of leaves."} ],
+  [ {q:"Which cells open and close the stomata?", a:["Guard cells","Root hair cells","Palisade cells","Sieve tubes"], e:"A pair of guard cells surrounds each stoma and changes shape to open or close it."},
+    {q:"Where are most stomata found on a typical leaf?", a:["On the lower surface","On the upper surface","On the leaf stalk","On the roots"], e:"Most stomata are on the shaded lower surface of the leaf."} ],
+  [ {q:"Why is it useful for most stomata to be on the LOWER surface of the leaf?", a:["It is cooler and shaded, so less water is lost","It gets more sunlight there","Insects can reach them more easily","It makes the leaf heavier"], e:"The underside is out of direct sun, so less water evaporates through the stomata."},
+    {q:"Inside the leaf, water evaporates from the surface of which cells?", a:["Spongy mesophyll cells","Root hair cells","Sieve tubes","Cells of the waxy cuticle"], e:"Water evaporates from the spongy mesophyll cells into the air spaces, then diffuses out of the stomata."} ],
+  [ {q:"What happens when a plant loses more water than it takes in?", a:["It wilts","It grows faster","It makes more flowers","It turns blue"], e:"Cells lose water and become soft (flaccid), so the plant droops or wilts."},
+    {q:"Stomata usually close at night. How does this help the plant?", a:["It saves water, as no carbon dioxide is needed for photosynthesis in the dark","It lets the plant take in more light","It helps the plant absorb minerals","It makes the leaves grow bigger"], e:"No light means no photosynthesis, so closing the stomata saves water without losing anything."} ],
+  [ {q:"Which is a useful effect of transpiration for the plant?", a:["It cools the leaves and pulls water and minerals up the stem","It makes glucose","It removes all oxygen from the leaf","It stops photosynthesis"], e:"Evaporation cools the leaf, and the transpiration stream brings water and minerals up from the roots."},
+    {q:"Cacti have spines instead of broad, flat leaves. What is the main reason?", a:["A smaller surface area means less water is lost","Spines carry out more photosynthesis","Spines absorb water from the air","Spines make the cactus grow taller"], e:"Spines have a tiny surface area, which cuts down transpiration in hot, dry deserts."} ] ]},
+
+ { name:"FACTORS & EXPERIMENTS", levels:[
+  [ {q:"On a hot day, what happens to the rate of transpiration?", a:["It increases","It decreases","It stops completely","It stays exactly the same"], e:"Heat makes water evaporate faster, so transpiration speeds up."},
+    {q:"In which weather will a plant lose water the fastest?", a:["Hot, dry and windy","Cold, damp and still","Dark and cold","Rainy and humid"], e:"Heat, dry air and wind all increase the rate of transpiration."} ],
+  [ {q:"Why does wind increase transpiration?", a:["It blows away moist air near the leaf, so more water vapour can diffuse out","It pushes water into the leaves","It closes the stomata","It cools the roots"], e:"Wind removes the humid air around the leaf, keeping a steep concentration gradient for water vapour."},
+    {q:"What does high humidity (damp air) do to transpiration?", a:["It slows it down","It speeds it up","It has no effect","It reverses it"], e:"Air already full of water vapour means less water vapour diffuses out of the leaf."} ],
+  [ {q:"Which piece of apparatus is used to measure how fast a leafy shoot takes up water?", a:["A potometer","A thermometer","A microscope","A barometer"], e:"A potometer tracks water uptake, often by timing how far an air bubble moves."},
+    {q:"Why does brighter light increase transpiration?", a:["Stomata open wider in the light","Light pushes water out of the leaf","Light makes the roots grow","Light closes the guard cells"], e:"Stomata open in light for photosynthesis, which also lets more water vapour escape."} ],
+  [ {q:"In a potometer, the air bubble moves 30 mm in 10 minutes. What is the rate of water uptake?", a:["3 mm per minute","300 mm per minute","0.3 mm per minute","40 mm per minute"], e:"Rate = distance / time = 30 mm / 10 min = 3 mm per minute."},
+    {q:"A class tests whether a fan changes the rate of transpiration. To make it a fair test, what must stay the same?", a:["The type and size of plant, the temperature and the light","Whether the fan is on or off","Only the colour of the pot","Nothing needs to stay the same"], e:"Only the fan (the independent variable) should change. Everything else is a control variable."} ],
+  [ {q:"A potometer measures water UPTAKE, not exactly transpiration. Why?", a:["Some water taken up is used by the plant, for example in photosynthesis","The potometer only measures sugar","Water never leaves the leaves","Air bubbles add extra water"], e:"A small amount of water is used or kept in cells, so uptake is slightly more than the water transpired."},
+    {q:"Leaf A has petroleum jelly on its LOWER surface, Leaf B on its UPPER surface, Leaf C has none. Which leaf loses the least mass after 2 days?", a:["Leaf A","Leaf B","Leaf C","All lose the same mass"], e:"Most stomata are on the lower surface. Sealing it blocks most water loss, so Leaf A loses the least."} ] ]}
+];
+const VALUES=[100,200,300,400,500];
+
+/* ================= AUDIO (WebAudio chiptune, original tune) ================= */
+const Audio8 = (()=>{
+  let ctx=null, master, musicGain, sfxGain, noiseBuf, timer=null, nextT=0, step=0;
+  let musicOn=true, sfxOn=true, thinking=false;
+  const BPM=140, STEP=60/BPM/2;
+  const freq=n=>{const m=n.match(/([A-G])(#?)(\d)/);const i={C:0,D:2,E:4,F:5,G:7,A:9,B:11}[m[1]]+(m[2]?1:0);return 440*2**((i+12*(+m[3]+1)-69)/12)};
+  const LEAD=("A4 C5 E5 A5 G5 E5 C5 E5  F4 A4 C5 F5 E5 C5 A4 C5  G4 B4 D5 G5 F5 D5 B4 D5  E5 - B4 - E5 D5 C5 B4 "+
+              "A4 - A4 C5 E5 - D5 C5  D5 - F5 - A5 G5 F5 E5  C5 E5 G5 E5 D5 B4 G4 B4  A4 - E4 - A4 - - -").split(/\s+/);
+  const BASS=("A2 - A3 - A2 - A3 -  F2 - F3 - F2 - F3 -  G2 - G3 - G2 - G3 -  E2 - E3 - E2 - E3 - "+
+              "A2 - A3 - A2 - A3 -  D2 - D3 - D2 - D3 -  C3 - C3 - G2 - G2 -  E2 - E2 - A2 - - -").split(/\s+/);
+  function init(){
+    if(ctx) return;
+    try{ ctx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return; }
+    master=ctx.createGain(); master.gain.value=.8; master.connect(ctx.destination);
+    musicGain=ctx.createGain(); musicGain.gain.value=.5; musicGain.connect(master);
+    sfxGain=ctx.createGain(); sfxGain.gain.value=.7; sfxGain.connect(master);
+    noiseBuf=ctx.createBuffer(1,ctx.sampleRate*.2,ctx.sampleRate);
+    const d=noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+  }
+  function tone(type,f,t,dur,vol,dest,f2){
+    const o=ctx.createOscillator(), g=ctx.createGain();
+    o.type=type; o.frequency.setValueAtTime(f,t);
+    if(f2) o.frequency.exponentialRampToValueAtTime(f2,t+dur);
+    g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+    o.connect(g); g.connect(dest); o.start(t); o.stop(t+dur+.02);
+  }
+  function noise(t,dur,vol,dest){
+    const s=ctx.createBufferSource(), g=ctx.createGain(), hp=ctx.createBiquadFilter();
+    hp.type="highpass"; hp.frequency.value=6000;
+    s.buffer=noiseBuf; g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+    s.connect(hp); hp.connect(g); g.connect(dest); s.start(t); s.stop(t+dur+.02);
+  }
+  function playStep(i,t){
+    const l=LEAD[i], b=BASS[i];
+    if(l!=="-" && !thinking) tone("square",freq(l),t,STEP*.85,.07,musicGain);
+    if(b!=="-") tone("triangle",freq(b),t,STEP*1.6,.22,musicGain);
+    if(i%2===1) noise(t,.03,.05,musicGain);
+    if(i%4===0) tone("sine",150,t,.12,.25,musicGain,40);
+  }
+  function sched(){ while(nextT<ctx.currentTime+.12){ playStep(step,nextT); nextT+=STEP; step=(step+1)%LEAD.length; } }
+  function startMusic(){ if(!ctx||!musicOn||timer) return; nextT=ctx.currentTime+.05; step=0; timer=setInterval(sched,25); }
+  function stopMusic(){ clearInterval(timer); timer=null; }
+  const now=()=>ctx.currentTime;
+  const S={
+    select(){ if(!ctx||!sfxOn)return; tone("square",660,now(),.06,.12,sfxGain); tone("square",990,now()+.06,.08,.12,sfxGain); },
+    correct(){ if(!ctx||!sfxOn)return; ["C5","E5","G5","C6"].forEach((n,i)=>tone("square",freq(n),now()+i*.08,.12,.14,sfxGain)); },
+    wrong(){ if(!ctx||!sfxOn)return; tone("sawtooth",300,now(),.45,.14,sfxGain,80); },
+    tick(){ if(!ctx||!sfxOn)return; tone("square",1400,now(),.04,.08,sfxGain); },
+    timeup(){ if(!ctx||!sfxOn)return; ["G4","E4","C4","G3"].forEach((n,i)=>tone("square",freq(n),now()+i*.14,.16,.14,sfxGain)); },
+    fanfare(){ if(!ctx||!sfxOn)return; [["C5",0],["C5",.12],["C5",.24],["G5",.36],["E5",.66],["G5",.78],["C6",.9]].forEach(([n,d])=>tone("square",freq(n),now()+d,.22,.13,sfxGain)); }
+  };
+  return {
+    init, sfx:S, startMusic, stopMusic,
+    setThinking(v){ thinking=v; },
+    toggleMusic(){ musicOn=!musicOn; musicOn?startMusic():stopMusic(); return musicOn; },
+    toggleSfx(){ sfxOn=!sfxOn; return sfxOn; },
+    resume(){ if(ctx&&ctx.state==="suspended") ctx.resume().catch(()=>{}); }
+  };
+})();
+const sfx=Audio8.sfx;
+
+/* ================= PIXEL ART ================= */
+const reduceMotion=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function drawPlant(frame){
+  const c=document.getElementById("plant"), g=c.getContext("2d");
+  const P=(x,y,col)=>{g.fillStyle=col;g.fillRect(x,y,1,1)};
+  g.fillStyle=css("--bg"); g.fillRect(0,0,32,40);
+  // soil
+  g.fillStyle="#4a2f1c"; g.fillRect(0,30,32,10);
+  g.fillStyle="#5e3c24"; for(let x=0;x<32;x+=3) g.fillRect(x,30+((x*7)%9),1,1);
+  // roots
+  const root="#d9c49a";
+  for(let y=30;y<39;y++){P(15,y,root);P(16,y,root)}
+  for(let k=0;k<6;k++){P(14-k,31+k,root);P(17+k,31+k,root)}
+  for(let k=0;k<3;k++){P(11-k,36,root);P(20+k,36,root);P(9,33+k,root);P(22,33+k,root)}
+  // stem
+  for(let y=6;y<30;y++){P(15,y,"#1f8a33");P(16,y,"#2aa83f")}
+  // leaves
+  const leaf=(sx,sy,dir)=>{const w=[2,4,6,5,3];w.forEach((len,dy)=>{for(let i=0;i<len;i++)P(sx+dir*i,sy+dy,i===len-1?"#1f8a33":css("--leaf"))});for(let i=0;i<5;i++)P(sx+dir*i,sy+2,"#1f8a33")};
+  leaf(17,9,1); leaf(14,15,-1); leaf(17,21,1); leaf(14,25,-1);
+  // flower
+  [[15,3],[16,3],[14,4],[17,4],[15,5],[16,5]].forEach(([x,y])=>P(x,y,"#ff7ab8")); P(15,4,css("--phloem")); P(16,4,css("--phloem"));
+  // water up the xylem (blue) and sugar down the phloem (orange)
+  const span=32, w=38-((frame)%span), s=7+((frame+16)%span);
+  P(15,w,css("--xylem")); if(w+1<39)P(15,w+1,css("--xylem"));
+  P(16,s,css("--phloem"));
+}
+let plantFrame=0;
+drawPlant(0);
+if(!reduceMotion) setInterval(()=>{ if(document.getElementById("screen-title").classList.contains("active")) drawPlant(++plantFrame); },110);
+
+function drawTrophy(){
+  const c=document.getElementById("trophy"), g=c.getContext("2d");
+  const map=["................","..YYYYYYYYYYYY..",".YYYYYYYYYYYYYY.","YY.YYYYYYYYYY.YY","YY.YYYYGGYYYY.YY",".YY.YYGGGGYY.YY.","..YYYYYGGYYYYY..","....YYYYYYYY....",".....YYYYYY.....","......YYYY......",".......YY.......",".......YY.......",".....OOOOOO.....","....OOOOOOOO....","....OOOOOOOO....","................"];
+  const col={Y:"#ffd23f",G:css("--leaf"),O:"#9a5b2c"};
+  g.clearRect(0,0,16,16);
+  map.forEach((row,y)=>[...row].forEach((ch,x)=>{if(col[ch]){g.fillStyle=col[ch];g.fillRect(x,y,1,1)}}));
+}
+
+/* ================= GAME ================= */
+const $=id=>document.getElementById(id);
+const COLORS=["#3fa9f5","#ffb020","#3ccf4e","#ff6fae","#b98cff","#ff4d5e","#2ee6d6","#ffe14d","#ff8a3d","#8fd16a","#6f8cff","#e8e8e8","#d97a4a","#c6f05a","#f07aff"];
+const DEFAULT_NAMES=["XYLEM","PHLOEM","STOMATA","ROOT HAIRS","GUARD CELLS","SIEVE TUBES","MESOPHYLL","LIGNIN","OSMOSIS","CACTI","CELERY","POTOMETER","SUCROSE","APHIDS","LEAF VEINS"];
+const S={teams:[],turn:0,ans:0,phase:"title",paused:false,used:0,cur:null,round:1,rounds:2,qorder:[]};
+
+function show(id){ document.querySelectorAll(".screen").forEach(s=>s.classList.toggle("active",s.id===id)); }
+const fmt=t=>{const s=Math.ceil(t);return Math.floor(s/60)+":"+String(s%60).padStart(2,"0")};
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+let toastT; function toast(msg){const t=$("toast");t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2600)}
+const playersOf=t=>t.players.filter(Boolean).join(" & ");
+
+/* ---------- setup: 2-15 teams of 2 players ---------- */
+let setupCount=4; const saved=[];
+function renderSetup(){
+  const list=$("teamlist");
+  list.querySelectorAll(".trow[data-i]").forEach(r=>{saved[+r.dataset.i]=[...r.querySelectorAll("input")].map(x=>x.value)});
+  list.innerHTML='<div class="trow head" aria-hidden="true"><span></span><span>TEAM NAME</span><span>PLAYER 1</span><span>PLAYER 2</span></div>';
+  for(let i=0;i<setupCount;i++){
+    const v=saved[i]||[DEFAULT_NAMES[i],"",""];
+    const r=document.createElement("div"); r.className="trow"; r.dataset.i=i; r.style.setProperty("--tc",COLORS[i]);
+    r.innerHTML='<span class="sw"></span>'+
+      '<input class="tname" type="text" id="tn'+i+'" maxlength="14" aria-label="Team '+(i+1)+' name">'+
+      '<input type="text" id="pa'+i+'" maxlength="12" placeholder="PLAYER 1" aria-label="Team '+(i+1)+' player 1">'+
+      '<input type="text" id="pb'+i+'" maxlength="12" placeholder="PLAYER 2" aria-label="Team '+(i+1)+' player 2">';
+    r.querySelectorAll("input").forEach((x,k)=>x.value=v[k]);
+    list.appendChild(r);
+  }
+  $("teamCount").textContent=setupCount;
+  $("minusBtn").disabled=setupCount<=2; $("plusBtn").disabled=setupCount>=15;
+}
+$("minusBtn").addEventListener("click",()=>{if(setupCount>2){setupCount--;renderSetup();sfx.select();}});
+$("plusBtn").addEventListener("click",()=>{if(setupCount<15){setupCount++;renderSetup();sfx.select();$("teamlist").lastChild.querySelector("input").focus();}});
+renderSetup();
+
+$("setup").addEventListener("submit",e=>{
+  e.preventDefault();
+  Audio8.init(); Audio8.resume();
+  const secs=+document.querySelector("input[name=clock]:checked").value;
+  S.teams=[];
+  for(let i=0;i<setupCount;i++){
+    S.teams.push({
+      name:($("tn"+i).value.trim()||("TEAM "+(i+1))).toUpperCase(),
+      players:[$("pa"+i).value.trim().toUpperCase(),$("pb"+i).value.trim().toUpperCase()],
+      color:COLORS[i],score:0,time:secs,right:0,steals:0,out:false
+    });
+  }
+  Object.assign(S,{turn:Math.floor(Math.random()*S.teams.length),paused:false,used:0,cur:null,round:1,
+    rounds:+document.querySelector("input[name=rounds]:checked").value,
+    qorder:TOPICS.map(t=>t.levels.map(()=>Math.random()<.5?[0,1]:[1,0]))});
+  S.ans=S.turn;
+  buildBoard(); buildScoreboard(); show("screen-game"); S.phase="board";
+  sfx.select(); Audio8.setThinking(false); Audio8.startMusic();
+  renderHUD();
+  toast(S.teams[S.turn].name+" GOES FIRST!");
+  last=performance.now();
+});
+
+function buildBoard(){
+  const b=$("board"); b.innerHTML="";
+  TOPICS.forEach(t=>{const d=document.createElement("div");d.className="cat";d.setAttribute("role","columnheader");d.textContent=t.name;b.appendChild(d)});
+  VALUES.forEach((v,li)=>TOPICS.forEach((t,ti)=>{
+    const btn=document.createElement("button");
+    btn.type="button"; btn.className="cell"; btn.textContent=v;
+    btn.setAttribute("aria-label",t.name+" for "+v+" points");
+    btn.addEventListener("click",()=>openQ(ti,li,btn));
+    b.appendChild(btn);
+  }));
+}
+
+function buildScoreboard(){
+  const sb=$("scoreboard"); sb.innerHTML="";
+  S.teams.forEach((t,i)=>{
+    const el=document.createElement("div"); el.className="team"; el.id="tm"+i; el.style.setProperty("--tc",t.color);
+    el.innerHTML='<div class="name"></div><div class="players"></div><div class="row"><span class="score"></span><span class="clock"></span></div><div class="flag"></div>';
+    el.querySelector(".name").textContent=t.name;
+    el.querySelector(".players").textContent=playersOf(t)||" ";
+    sb.appendChild(el);
+  });
+}
+
+const activeTeam=()=>S.phase==="board"?S.turn:S.ans;
+
+function renderHUD(){
+  const act=activeTeam(), live=S.phase==="board"||S.phase==="question";
+  S.teams.forEach((t,i)=>{
+    const el=$("tm"+i); if(!el) return;
+    el.querySelector(".score").textContent=t.score;
+    el.querySelector(".clock").textContent=fmt(t.time);
+    el.classList.toggle("active",live&&i===act&&!t.out);
+    el.classList.toggle("low",t.time<=30);
+    el.classList.toggle("out",t.out);
+    let flag="";
+    if(t.out) flag="OUT OF TIME";
+    else if(live&&i===act) flag=S.phase==="board"?"▶ YOUR TURN":(S.cur&&S.cur.stealing?"▶ STEALING":"▶ ANSWERING");
+    el.querySelector(".flag").textContent=flag;
+  });
+  const cur=S.teams[S.turn];
+  $("turnline").textContent=S.phase==="board"&&cur?"ROUND "+S.round+"/"+S.rounds+" · "+cur.name+": PICK A TOPIC AND POINTS":"";
+  if(S.cur&&S.phase!=="board"){
+    const t=S.teams[S.ans], q=$("qclock");
+    q.textContent="TIME "+fmt(t.time);
+    q.classList.toggle("low",t.time<=10&&S.phase==="question");
+  }
+}
+
+function setQTeam(){
+  const t=S.teams[S.ans], p=playersOf(t);
+  $("qteam").textContent=(S.cur.stealing?"STEAL: ":"")+t.name+(p?" ("+p+")":"");
+  $("qteam").style.color=t.color;
+}
+
+function openQ(ti,li,btn){
+  if(S.phase!=="board"||S.paused) return;
+  // each slot has 2 questions: round 1 uses one, round 2 uses the other
+  const raw=TOPICS[ti].levels[li][S.qorder[ti][li][S.round-1]];
+  const order=shuffle([0,1,2,3]);
+  S.ans=S.turn;
+  S.cur={ti,li,btn,q:raw,opts:order.map(i=>raw.a[i]),ans:order.indexOf(0),value:VALUES[li],tried:new Set([S.turn]),wrong:new Set(),stealing:false};
+  S.phase="question"; Audio8.setThinking(true); sfx.select();
+  $("qcat").textContent=TOPICS[ti].name; $("qval").textContent=VALUES[li]+" PTS";
+  setQTeam();
+  $("qtext").textContent=raw.q;
+  const box=$("opts"); box.innerHTML="";
+  S.cur.opts.forEach((txt,i)=>{
+    const b=document.createElement("button"); b.type="button"; b.className="opt";
+    b.innerHTML='<span class="k">'+(i+1)+'</span><span></span>'; b.lastChild.textContent=txt;
+    b.addEventListener("click",()=>answer(i)); box.appendChild(b);
+  });
+  $("feedback").hidden=true; $("steal").hidden=true;
+  $("qmodal").hidden=false; renderHUD();
+  box.firstChild.focus();
+}
+
+function answer(i,timedOut){
+  if(S.phase!=="question") return;
+  const c=S.cur, t=S.teams[S.ans];
+  if(i>=0&&c.wrong.has(i)) return;
+  if(i===c.ans){
+    t.score+=c.value; t.right++; if(c.stealing) t.steals++;
+    sfx.correct(); return finish(S.ans);
+  }
+  if(!timedOut) sfx.wrong();
+  if(i>=0){ c.wrong.add(i); const b=$("opts").children[i]; b.classList.add("wrong"); b.disabled=true; }
+  offerSteal(timedOut);
+}
+
+/* after a wrong answer, any team that has not tried yet (and still has time) can steal */
+function offerSteal(timedOut){
+  const c=S.cur;
+  const eligible=S.teams.map((t,i)=>i).filter(i=>!S.teams[i].out&&!c.tried.has(i));
+  if(!eligible.length||4-c.wrong.size<=1) return finish(null);
+  S.phase="steal"; Audio8.setThinking(false);
+  [...$("opts").children].forEach(b=>b.disabled=true);
+  $("stealTitle").textContent=(timedOut?"TIME'S UP!":"WRONG!")+" STEAL CHANCE!";
+  const box=$("stealbtns"); box.innerHTML="";
+  eligible.forEach(i=>{
+    const b=document.createElement("button"); b.type="button"; b.textContent=S.teams[i].name;
+    b.style.setProperty("--tc",S.teams[i].color);
+    b.addEventListener("click",()=>startSteal(i)); box.appendChild(b);
+  });
+  const no=document.createElement("button"); no.type="button"; no.className="nosteal"; no.textContent="NO STEAL - SHOW ANSWER";
+  no.addEventListener("click",()=>finish(null)); box.appendChild(no);
+  $("steal").hidden=false; renderHUD();
+  box.firstChild.focus();
+}
+
+function startSteal(j){
+  const c=S.cur; c.tried.add(j); c.stealing=true; S.ans=j;
+  S.phase="question"; Audio8.setThinking(true); sfx.select();
+  $("steal").hidden=true;
+  [...$("opts").children].forEach((b,k)=>b.disabled=c.wrong.has(k));
+  setQTeam(); renderHUD();
+  [...$("opts").children].find(b=>!b.disabled).focus();
+  last=performance.now();
+}
+
+function finish(winner){
+  const c=S.cur;
+  S.phase="feedback"; Audio8.setThinking(false);
+  $("steal").hidden=true;
+  [...$("opts").children].forEach((b,k)=>{b.disabled=true; if(k===c.ans)b.classList.add("right");});
+  c.btn.disabled=true;
+  if(winner!=null){
+    const t=S.teams[winner];
+    c.btn.textContent=t.name.slice(0,8)+" +"+c.value;
+    c.btn.classList.add("won"); c.btn.style.setProperty("--tc",t.color);
+  } else c.btn.textContent="MISSED";
+  S.used++;
+  const fb=$("feedback"); fb.hidden=false; fb.className="feedback "+(winner!=null?"good":"bad");
+  $("fbTitle").textContent=winner!=null
+    ?(c.stealing?"STOLEN by "+S.teams[winner].name+"! +":"CORRECT! +")+c.value
+    :"NOBODY GOT IT";
+  $("fbText").textContent=(winner!=null?"":"Answer: "+c.opts[c.ans]+". ")+c.q.e;
+  $("nextBtn").textContent=gameOver()?"SEE RESULTS ▶":(boardDone()?"START ROUND "+(S.round+1)+" ▶":"NEXT TURN ▶");
+  renderHUD(); $("nextBtn").focus();
+}
+
+const boardDone=()=>S.used>=25;
+const gameOver=()=>(boardDone()&&S.round>=S.rounds)||S.teams.every(t=>t.out);
+
+function advanceTurn(){
+  const n=S.teams.length;
+  for(let k=1;k<=n;k++){ const i=(S.turn+k)%n; if(!S.teams[i].out){ S.turn=i; return true; } }
+  return false;
+}
+
+function nextTurn(){
+  $("qmodal").hidden=true; S.cur=null;
+  if(gameOver()||!advanceTurn()) return endGame();
+  if(boardDone()){
+    S.round++; S.used=0; buildBoard();
+    S.ans=S.turn; S.phase="board"; sfx.fanfare(); renderHUD();
+    toast("ROUND "+S.round+"! NEW QUESTIONS. "+S.teams[S.turn].name+" STARTS");
+    return;
+  }
+  S.ans=S.turn; S.phase="board"; sfx.select(); renderHUD();
+}
+$("nextBtn").addEventListener("click",nextTurn);
+
+function onTimeOut(i){
+  const t=S.teams[i]; t.out=true; sfx.timeup();
+  if(S.phase==="question") answer(-1,true);
+  else {
+    toast(t.name+" RAN OUT OF TIME!");
+    if(gameOver()||!advanceTurn()) endGame(); else { S.ans=S.turn; renderHUD(); }
+  }
+}
+
+function endGame(){
+  S.phase="end"; $("qmodal").hidden=true; $("pauseModal").hidden=true; S.paused=false;
+  Audio8.stopMusic(); sfx.fanfare();
+  const ranked=S.teams.slice().sort((a,b)=>b.score-a.score);
+  const top=ranked[0], tie=ranked.length>1&&ranked[1].score===top.score;
+  $("winTitle").textContent=tie?"IT'S A DRAW!":top.name+" WINS!";
+  $("winSub").textContent=tie?"JOINT CHAMPIONS OF THE TRANSPORT SYSTEM":"TOP OF THE TRANSPORT SYSTEM";
+  const list=$("final"); list.innerHTML="";
+  let pos=0;
+  ranked.forEach((t,k)=>{
+    if(k===0||t.score!==ranked[k-1].score) pos=k+1;
+    const li=document.createElement("li"); li.style.setProperty("--tc",t.color);
+    li.innerHTML='<span class="pos"></span><span class="nm"><span></span><small></small></span><span class="pts"></span>';
+    li.querySelector(".pos").textContent=pos;
+    li.querySelector(".nm span").textContent=t.name;
+    const p=playersOf(t);
+    li.querySelector(".nm small").textContent=(p?p+" · ":"")+t.right+" correct · "+t.steals+" stolen";
+    li.querySelector(".pts").textContent=t.score;
+    list.appendChild(li);
+  });
+  drawTrophy(); show("screen-end"); $("againBtn").focus();
+}
+$("againBtn").addEventListener("click",()=>{ S.phase="title"; show("screen-title"); $("startBtn").focus(); });
+
+/* pause + toggles */
+function setPause(p){ if(S.phase==="title"||S.phase==="end") return; S.paused=p; $("pauseModal").hidden=!p; p?Audio8.stopMusic():Audio8.startMusic(); if(p)$("resumeBtn").focus(); last=performance.now(); }
+$("pauseBtn").addEventListener("click",()=>setPause(true));
+$("resumeBtn").addEventListener("click",()=>setPause(false));
+$("quitBtn").addEventListener("click",endGame);
+$("musicBtn").addEventListener("click",e=>{Audio8.init();const on=Audio8.toggleMusic();e.target.textContent="MUSIC "+(on?"ON":"OFF");e.target.setAttribute("aria-pressed",on)});
+$("sfxBtn").addEventListener("click",e=>{const on=Audio8.toggleSfx();e.target.textContent="SFX "+(on?"ON":"OFF");e.target.setAttribute("aria-pressed",on)});
+
+/* keyboard: 1-4 or A-D to answer, P to pause */
+document.addEventListener("keydown",e=>{
+  if(e.target.tagName==="INPUT") return;
+  const k=e.key.toLowerCase();
+  if(k==="p"&&S.phase!=="title"&&S.phase!=="end"){ setPause(!S.paused); return; }
+  if(S.phase==="question"&&!S.paused){
+    let i="1234".indexOf(k); if(i<0) i="abcd".indexOf(k);
+    if(k&&i>-1){ e.preventDefault(); answer(i); }
+  }
+});
+
+/* each team's clock only runs while that team is picking or answering */
+let last=performance.now();
+setInterval(()=>{
+  const now=performance.now(), dt=(now-last)/1000; last=now;
+  if(S.paused||(S.phase!=="board"&&S.phase!=="question")) return;
+  const i=activeTeam(), t=S.teams[i]; if(!t||t.out) return;
+  const before=t.time; t.time=Math.max(0,before-dt);
+  if(t.time<=10&&t.time>0&&Math.ceil(t.time)<Math.ceil(before)) sfx.tick();
+  renderHUD();
+  if(t.time===0) onTimeOut(i);
+},100);
+</script>
+</body>
+</html>
