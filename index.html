@@ -802,6 +802,7 @@ function relayHost(code,onConn){
       let m; try{ m=JSON.parse(buf.toString()); }catch(e){ return; }
       if(!m||typeof m!=="object") return;
       let vc=conns.get(sid);
+      if(m.t==="probe"){ try{ cl.publish(base+"dn/"+sid,'{"t":"here"}',{qos:0}); }catch(e){} return; } // "is the teacher on this broker?"
       if(m.t==="bye"){ if(vc) vc.close(); return; }
       if(!vc||vc.dead){
         vc=makeVConn(s=>{ try{ cl.publish(base+"dn/"+sid,s,{qos:0}); }catch(e){} });
@@ -818,48 +819,49 @@ function relayHost(code,onConn){
   const iv=setInterval(()=>{ const now=Date.now(); conns.forEach(vc=>{ if(now-vc.seen>RELAY_DEAD_MS) vc.close(); }); },5000);
   return {destroy(){ clearInterval(iv); conns.forEach(vc=>vc.close()); clients.forEach(cl=>{ try{cl.end()}catch(e){} }); }};
 }
-/* Student side: try brokers in order until the teacher answers. */
-function relayClient(code,hello,onFail){
+/* Student side: ask every broker at the same time; the first one where the teacher answers is used. */
+function relayClient(code,onFail){
   const sid=(Math.random().toString(36).slice(2)+Date.now().toString(36)).replace(/[^a-z0-9]/g,"").slice(0,24);
   const up=RELAY_TOPIC+code+"/up/"+sid, dn=RELAY_TOPIC+code+"/dn/"+sid;
-  let cl=null, idx=-1, wait=null, beat=null, last=0, live=false;
+  let cl=null, wait=null, beat=null, last=0, live=false, left=0, trying=[];
   const vc=makeVConn(s=>{ if(cl) try{ cl.publish(up,s,{qos:0}); }catch(e){} });
   vc.open=false;
-  const drop=()=>{ const c=cl; cl=null; if(c) setTimeout(()=>{ try{c.end(true)}catch(e){} },200); };
-  const next=()=>{
-    clearTimeout(wait); vc.open=false; drop();
-    if(vc.dead) return;
-    if(++idx>=RELAY_BROKERS.length){ vc.dead=true; return onFail(); }
-    let c; try{ c=mqttConnect(RELAY_BROKERS[idx]); }catch(e){ return next(); }
-    cl=c;
-    wait=setTimeout(next,9000); // broker unreachable, or the teacher isn't on it
-    let got=false;
+  const end=c=>setTimeout(()=>{ try{c.end(true)}catch(e){} },200);
+  const giveUp=()=>{ if(live||vc.dead) return; vc.dead=true; clearTimeout(wait); trying.forEach(end); trying=[]; onFail(); };
+  RELAY_BROKERS.forEach(url=>{
+    let c; try{ c=mqttConnect(url); }catch(e){ return; }
+    trying.push(c); left++;
+    let out=false;
     c.on("error",()=>{});
-    c.on("close",()=>{ if(cl===c&&!got&&!live) next(); }); // broker refused/unreachable: try the next one now
+    c.on("close",()=>{ // broker refused/unreachable before anyone answered: this one is out
+      if(live||vc.dead||out) return; out=true; end(c); if(--left===0) giveUp();
+    });
     c.on("connect",()=>{
-      got=true;
-      if(cl!==c) return;
-      c.subscribe(dn,{qos:0},err=>{ if(cl!==c||err) return; vc.open=true; if(!live) vc.send(hello); });
+      if(vc.dead||out||(live&&cl!==c)) return;
+      c.subscribe(dn,{qos:0},err=>{ if(err||vc.dead||live) return; try{ c.publish(up,'{"t":"probe"}',{qos:0}); }catch(e){} });
     });
     c.on("message",(t,buf)=>{
-      if(cl!==c||vc.dead) return;
+      if(vc.dead||out||(live&&cl!==c)) return;
       let m; try{ m=JSON.parse(buf.toString()); }catch(e){ return; }
       last=Date.now();
-      if(!live){
-        live=true; clearTimeout(wait); vc.emit("open");
-        beat=setInterval(()=>{ if(Date.now()-last>RELAY_DEAD_MS) return vc.close(); vc.send({t:"ping"}); },5000);
+      if(!live){ // the teacher is on this broker: keep it, drop the others
+        live=true; cl=c; clearTimeout(wait); vc.open=true;
+        trying.forEach(x=>{ if(x!==c) end(x); }); trying=[];
+        beat=setInterval(()=>{ if(Date.now()-last>RELAY_DEAD_MS) return vc.close(); vc.send({t:vc.inUse?"ping":"probe"}); },5000);
+        vc.emit("open");
       }
-      if(m&&m.t==="pong") return;
+      if(m&&(m.t==="pong"||m.t==="here")) return;
       vc.emit("data",m);
     });
-  };
+  });
+  const stop=()=>{ clearInterval(beat); clearTimeout(wait); vc.open=false; trying.forEach(end); trying=[]; const c=cl; cl=null; if(c) end(c); };
   vc.destroy=()=>{ // quiet shutdown (no "close" event)
-    if(vc.dead) return; vc.dead=true; clearInterval(beat); clearTimeout(wait);
-    if(vc.open){ vc.send({t:"bye"}); } vc.open=false; drop();
+    if(vc.dead) return; if(vc.open&&vc.inUse) vc.send({t:"bye"}); vc.dead=true; stop();
   };
   const baseClose=vc.close;
-  vc.close=()=>{ if(vc.dead) return; clearInterval(beat); clearTimeout(wait); vc.open=false; drop(); baseClose(); };
-  next();
+  vc.close=()=>{ if(vc.dead) return; stop(); baseClose(); };
+  if(left) wait=setTimeout(giveUp,9000); // no broker has the teacher
+  else setTimeout(giveUp,0);
   return vc;
 }
 const STEAL_WINDOW=10;
@@ -887,7 +889,7 @@ function boardHTML(board,clickable){
 
 /* home */
 $("goHost").addEventListener("click",()=>{ Audio8.init(); sfx.select(); show("screen-setup"); });
-$("goJoin").addEventListener("click",()=>{ Audio8.init(); Audio8.stopMusic(); sfx.select(); show("screen-join"); $("codeIn").focus(); });
+$("goJoin").addEventListener("click",()=>{ Audio8.init(); Audio8.stopMusic(); sfx.select(); show("screen-join"); $("codeIn").focus(); if(!C.conn) ensurePeer(); });
 
 /* ================= TEACHER (HOST) ================= */
 const S={mode:"team",size:2,phase:"setup",teams:[],turn:0,ans:0,used:0,round:1,rounds:2,secs:300,qorder:[],board:[],cur:null,paused:false,stealLeft:0,log:[],code:"",peer:null,relay:null,clients:new Map()};
@@ -1412,89 +1414,142 @@ setInterval(()=>{
 },100);
 
 /* ================= STUDENT DEVICE (CLIENT) ================= */
-const C={peer:null,conn:null,code:"",mode:"",joined:false,state:null,you:-1,viewKey:"",retry:null,lastPhaseKey:""};
+const C={peer:null,conn:null,att:null,swap:null,code:"",mode:"",joined:false,state:null,you:-1,viewKey:"",retry:null,lastPhaseKey:""};
 C.cid=store.get("sq-cid")||(Math.random().toString(36).slice(2)+Date.now().toString(36));
 store.set("sq-cid",C.cid);
 
 function joinErr(msg){ $("joinErr").textContent=msg; $("joinBtn").disabled=false; }
 $("joinBack").addEventListener("click",()=>{ show("screen-home"); });
-$("codeIn").addEventListener("input",e=>{ e.target.value=e.target.value.replace(/\D/g,"").slice(0,6); });
+$("codeIn").addEventListener("input",e=>{
+  e.target.value=e.target.value.replace(/\D/g,"").slice(0,6);
+  if(e.target.value.length===6&&!C.joined) connectTo(e.target.value,false); // start linking before JOIN is pressed
+});
 $("joinCodeForm").addEventListener("submit",e=>{
   e.preventDefault(); Audio8.init(); Audio8.resume();
   const code=$("codeIn").value.trim();
   if(!/^\d{6}$/.test(code)) return joinErr("The code has 6 digits. Check the teacher's screen.");
   $("joinErr").textContent="Connecting..."; $("joinBtn").disabled=true;
-  connectTo(code);
+  connectTo(code,true);
 });
 
 const BLOCKED="Couldn't reach the teacher's game from this network. Check the internet on both devices and try again, or play in ONE SCREEN mode.";
-function wireHostConn(conn){
-  conn.on("open",()=>{ clearInterval(C.retry); C.retry=null; if(!conn.relay) send(conn,{t:"hello",cid:C.cid}); });
-  conn.on("data",onHostMsg);
-  conn.on("close",()=>{ if(C.conn===conn) onHostLost(); });
-  conn.on("error",()=>{});
+/* Joining is a race: the direct link (WebRTC) and the backup relay both start at once, and the
+   first one that reaches the teacher is used. If the relay wins, the game moves to the direct
+   link as soon as that opens. Links start as soon as the 6 digits are typed (armed=false), so
+   pressing JOIN is usually instant; nothing is said to the teacher until JOIN is pressed. */
+function quiet(c){ try{ c.relay?c.destroy():c.close(); }catch(e){} }
+function dropAttempt(){
+  const a=C.att, cur=C.conn, sw=C.swap; C.att=null; C.conn=null; C.swap=null;
+  if(a){ a.dead=true; clearTimeout(a.to); clearTimeout(a.ng); }
+  [cur,sw,a&&a.rtc,a&&a.relay].forEach(c=>{ if(c) quiet(c); });
 }
-function startRelay(code){
-  if(C.conn&&C.conn.relay&&!C.conn.dead) return; // already trying
-  if(typeof mqtt==="undefined") return C.joined||joinErr(BLOCKED);
-  C.useRelay=true; // this network needs the relay: reconnects go straight to it
-  if(!C.joined) $("joinErr").textContent="Direct link blocked. Using backup connection...";
-  const conn=relayClient(code,{t:"hello",cid:C.cid},()=>{ if(C.conn===conn) C.conn=null; if(!C.joined) joinErr(BLOCKED); });
-  C.conn=conn; wireHostConn(conn);
-}
-function connectTo(code){
-  if(C.code!==code) C.useRelay=false;
-  C.code=code;
-  if(typeof Peer==="undefined"&&typeof mqtt==="undefined") return joinErr("Could not load the connection library. Check your internet and reload.");
-  if(C.useRelay||typeof Peer==="undefined") return startRelay(code);
-  const go=()=>{
-    if(C.useRelay) return startRelay(code);
-    if(C.conn&&C.conn.relay) return; // relay already in use
-    const conn=C.peer.connect(PEER_PREFIX+code,{reliable:true,serialization:"json"});
-    C.conn=conn;
-    let failed=false;
-    const fail=()=>{
-      if(failed||conn.open) return; failed=true; clearTimeout(to);
-      const mine=C.conn===conn; if(mine) C.conn=null;
-      try{conn.close()}catch(e){}
-      if(mine) startRelay(code);
-    };
-    const to=setTimeout(fail,12000);
-    conn.on("iceStateChanged",st=>{ if(st==="failed") fail(); });
-    conn.on("open",()=>clearTimeout(to));
-    wireHostConn(conn);
-  };
-  if(C.peer&&!C.peer.destroyed&&C.peer.open) return go();
+function ensurePeer(){
+  if(typeof Peer==="undefined") return null;
+  if(C.peer&&!C.peer.destroyed&&!C.peer.disconnected) return C.peer;
   if(C.peer){ try{C.peer.destroy()}catch(e){} }
-  const peer=C.peer=new Peer(PEER_OPTS);
-  peer.on("open",go);
+  let peer; try{ peer=new Peer(PEER_OPTS); }catch(e){ C.peer=null; return null; }
+  C.peer=peer;
   peer.on("disconnected",()=>{ try{peer.reconnect()}catch(e){} });
   peer.on("error",err=>{
-    if(C.peer!==peer) return;
-    if(err.type==="peer-unavailable"){
-      if(C.joined) return; // reconnect loop handles it
-      joinErr("No game found with code "+code+". Check the code on the teacher's screen.");
-    } else if(!C.joined||!C.conn) startRelay(code); // can't use the PeerJS server here: go via relay
+    const a=C.att; if(C.peer!==peer||!a||a.dead) return;
+    if(a.rtc&&a.rtc.open) return; // the open link doesn't need the PeerJS server any more
+    if(err.type==="peer-unavailable"&&!a.conn){ // no such game on the PeerJS server: give the relay a moment, then say so
+      a.noGame=true; clearTimeout(a.ng);
+      a.ng=setTimeout(()=>{ if(!a.conn&&!(a.relay&&a.relay.open)) attemptFailed(a); },2500);
+    }
+    linkFail(a,"rtc");
   });
+  return peer;
+}
+function useLink(a,conn){
+  const old=a.conn; a.conn=C.conn=conn; conn.inUse=true;
+  clearInterval(C.retry); C.retry=null; clearTimeout(a.ng);
+  if(!conn.relay){
+    clearTimeout(a.to);
+    if(old){ C.swap=old; setTimeout(()=>{ if(C.swap===old){ C.swap=null; quiet(old); } },4000); } // moving off the relay: close it once the teacher has switched too
+    else if(a.relay) quiet(a.relay);
+    a.relay=null;
+  }
+  send(conn,{t:"hello",cid:C.cid});
+}
+function linkReady(a,conn){
+  if(a.dead||C.att!==a) return quiet(conn);
+  if(!a.armed) return; // wait for JOIN
+  if(!a.conn||(a.conn.relay&&!conn.relay)) return useLink(a,conn);
+  if(conn!==a.conn) quiet(conn);
+}
+function linkFail(a,which){
+  if(a.dead||C.att!==a) return;
+  const c=a[which]; a[which]=null; a[which+"Out"]=true;
+  if(c&&c!==a.conn) quiet(c);
+  if(a.rtcOut&&a.relayOut&&!a.conn) attemptFailed(a);
+}
+function attemptFailed(a){
+  if(a.dead) return;
+  const show=a.armed&&!C.joined&&C.att===a;
+  if(C.att===a) dropAttempt(); else a.dead=true;
+  if(show) joinErr(a.noGame?"No game found with code "+a.code+". Check the code on the teacher's screen.":BLOCKED);
+}
+function wireLink(a,which,conn){
+  a[which]=conn;
+  conn.on("open",()=>linkReady(a,conn));
+  conn.on("data",m=>{ if(C.conn===conn) onHostMsg(m); });
+  conn.on("close",()=>{ if(C.conn===conn) onHostLost(); else if(a[which]===conn) linkFail(a,which); });
+  conn.on("error",()=>{});
+}
+function startRtc(a){
+  const peer=ensurePeer(); if(!peer) return linkFail(a,"rtc");
+  a.to=setTimeout(()=>{ if(!(a.rtc&&a.rtc.open)) linkFail(a,"rtc"); },12000);
+  const go=()=>{
+    if(a.dead||C.att!==a||C.peer!==peer||a.rtcOut) return;
+    let conn; try{ conn=peer.connect(PEER_PREFIX+a.code,{reliable:true,serialization:"json"}); }catch(e){}
+    if(!conn) return linkFail(a,"rtc");
+    conn.on("iceStateChanged",st=>{ if(st==="failed"&&!conn.open&&a.rtc===conn) linkFail(a,"rtc"); });
+    wireLink(a,"rtc",conn);
+  };
+  if(peer.open) go(); else peer.once("open",go);
+}
+function startRelay(a){
+  if(typeof mqtt==="undefined") return linkFail(a,"relay");
+  let conn; try{ conn=relayClient(a.code,()=>linkFail(a,"relay")); }catch(e){ return linkFail(a,"relay"); }
+  wireLink(a,"relay",conn);
+}
+function connectTo(code,armed){
+  if(typeof Peer==="undefined"&&typeof mqtt==="undefined"){ if(armed) joinErr("Could not load the connection library. Check your internet and reload."); return; }
+  let a=C.att;
+  if(a&&!a.dead&&a.code===code&&!(a.conn&&!a.conn.open)){ // already connecting (or connected) to this game
+    if(!armed) return;
+    if(a.conn) return send(a.conn,{t:"hello",cid:C.cid});
+    if(!a.armed){ a.armed=true; const c=(a.rtc&&a.rtc.open&&a.rtc)||(a.relay&&a.relay.open&&a.relay); if(c) useLink(a,c); }
+    return;
+  }
+  dropAttempt();
+  C.code=code;
+  a=C.att={code,armed:!!armed,conn:null,rtc:null,relay:null,rtcOut:false,relayOut:false,noGame:false,dead:false,to:null,ng:null};
+  startRelay(a);
+  if(!a.dead) startRtc(a);
 }
 
 function onHostLost(){
   if(!C.joined||(C.state&&C.state.phase==="end")) return;
   renderPlayMsg("LOST CONNECTION","Trying to reconnect to the teacher's game...",false);
-  if(!C.retry) C.retry=setInterval(()=>connectTo(C.code),4000);
+  dropAttempt();
+  connectTo(C.code,true); // straight away, then keep trying
+  if(!C.retry) C.retry=setInterval(()=>connectTo(C.code,true),4000);
 }
 
 function onHostMsg(m){
   if(!m||typeof m!=="object") return;
   if(m.t==="who") return send(C.conn,{t:"hello",cid:C.cid}); // relay: teacher lost track of us
   if(m.t==="welcome"){
+    if(C.swap){ const o=C.swap; C.swap=null; quiet(o); if(!!m.joined===C.joined) return; } // just moved from the relay to the direct link: nothing to redraw
     C.mode=m.mode; C.size=m.size||2;
     if(m.joined){ C.joined=true; show("screen-play"); return; }
     setupJoinForm();
   } else if(m.t==="reject"){ joinErr(m.msg); $("joinErr2").textContent=m.msg; $("joinTeamBtn").disabled=true; $("teamPick").querySelectorAll("button").forEach(b=>b.disabled=true); }
   else if(m.t==="joinerr"){ $("joinErr2").textContent=m.msg; $("joinTeamBtn").disabled=false; }
   else if(m.t==="joined"){ C.joined=true; sfx.correct(); show("screen-play"); C.viewKey=""; }
-  else if(m.t==="kicked"){ C.joined=false; clearInterval(C.retry); C.retry=null; if(C.conn&&C.conn.relay){ const k=C.conn; setTimeout(()=>k.destroy(),300); } C.useRelay=false; renderPlayMsg("GAME CLOSED",m.msg||"The teacher removed you from the game.",true); show("screen-play"); }
+  else if(m.t==="kicked"){ C.joined=false; clearInterval(C.retry); C.retry=null; dropAttempt(); renderPlayMsg("GAME CLOSED",m.msg||"The teacher removed you from the game.",true); show("screen-play"); }
   else if(m.t==="state"){ C.state=m; C.you=m.you; renderClient(); }
 }
 
@@ -1618,7 +1673,7 @@ function updateLive(s){
 /* auto-join from link: ?code=123456 */
 (function(){
   const code=new URLSearchParams(location.search).get("code");
-  if(code&&/^\d{6}$/.test(code)){ show("screen-join"); $("codeIn").value=code; }
+  if(code&&/^\d{6}$/.test(code)){ show("screen-join"); $("codeIn").value=code; connectTo(code,false); }
 })();
 </script>
 </body>
