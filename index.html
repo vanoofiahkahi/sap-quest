@@ -755,6 +755,17 @@ const COLORS=["#3fa9f5","#ffb020","#3ccf4e","#ff6fae","#b98cff","#ff4d5e","#2ee6
 const DEFAULT_NAMES=["XYLEM","PHLOEM","STOMATA","ROOT HAIRS","GUARD CELLS","SIEVE TUBES","MESOPHYLL","LIGNIN","OSMOSIS","CACTI","CELERY","POTOMETER","SUCROSE","APHIDS","LEAF VEINS"];
 const SHORT=["ROOTS","XYLEM","PHLOEM","TRANSPIR- ATION","EXPERI- MENTS"];
 const PEER_PREFIX="transquest-v1-";
+/* WebRTC routing. Devices try to connect directly first (STUN). If the network blocks that
+   (school Wi-Fi, "client isolation", strict routers), traffic goes through a TURN relay.
+   For reliable classroom use, paste your own free TURN credentials into MY_TURN
+   (e.g. from metered.ca -> TURN Server -> Credentials). */
+const MY_TURN={urls:[],username:"",credential:""};
+const ICE_SERVERS=[
+  {urls:["stun:stun.l.google.com:19302","stun:stun1.l.google.com:19302","stun:stun.cloudflare.com:3478"]},
+  ...(MY_TURN.urls.length?[MY_TURN]:[]),
+  {urls:["turn:eu-0.turn.peerjs.com:3478","turn:us-0.turn.peerjs.com:3478"],username:"peerjs",credential:"peerjsp"}
+];
+const PEER_OPTS={config:{iceServers:ICE_SERVERS,sdpSemantics:"unified-plan"},debug:1};
 const STEAL_WINDOW=10;
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const clean=(s,n)=>String(s==null?"":s).replace(/[\u0000-\u001f]/g,"").trim().toUpperCase().slice(0,n);
@@ -852,7 +863,7 @@ function openRoom(){
   if(typeof Peer==="undefined"){ $("lobbyErr").textContent="Could not load the connection library. Check the internet connection, then reload the page."; return; }
   const code=String(Math.floor(100000+Math.random()*900000));
   if(S.peer){ try{S.peer.destroy()}catch(e){} }
-  const peer=new Peer(PEER_PREFIX+code); S.peer=peer;
+  const peer=new Peer(PEER_PREFIX+code,PEER_OPTS); S.peer=peer;
   peer.on("open",()=>{
     S.code=code;
     const url=location.origin+location.pathname+"?code="+code;
@@ -1315,7 +1326,11 @@ function connectTo(code){
   const go=()=>{
     const conn=C.peer.connect(PEER_PREFIX+code,{reliable:true,serialization:"json"});
     C.conn=conn;
-    const to=setTimeout(()=>{ if(!conn.open){ joinErr("Could not reach the game. Check the code, or ask your teacher if the game is still open."); try{conn.close()}catch(e){} } },10000);
+    let failed=false;
+    const fail=msg=>{ if(failed||conn.open) return; failed=true; clearTimeout(to); try{conn.close()}catch(e){} if(!C.joined) joinErr(msg); };
+    const BLOCKED="Found the game, but this network is blocking the connection between devices. Try mobile data/hotspot on this device or the teacher's, or play in ONE SCREEN mode.";
+    const to=setTimeout(()=>fail(BLOCKED),25000);
+    conn.on("iceStateChanged",st=>{ if(st==="failed") fail(BLOCKED); });
     conn.on("open",()=>{ clearTimeout(to); clearInterval(C.retry); C.retry=null; send(conn,{t:"hello",cid:C.cid}); });
     conn.on("data",onHostMsg);
     conn.on("close",()=>{ if(C.conn===conn) onHostLost(); });
@@ -1323,7 +1338,7 @@ function connectTo(code){
   };
   if(C.peer&&!C.peer.destroyed&&C.peer.open) return go();
   if(C.peer){ try{C.peer.destroy()}catch(e){} }
-  C.peer=new Peer();
+  C.peer=new Peer(PEER_OPTS);
   C.peer.on("open",go);
   C.peer.on("disconnected",()=>{ try{C.peer.reconnect()}catch(e){} });
   C.peer.on("error",err=>{
