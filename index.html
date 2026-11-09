@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
 <style>
 :root{
-  /* Layout idea: an 8-bit arcade cabinet. Two team panels on top, a 5x5 pixel question board below, overlays for questions. */
+  /* Layout idea: an 8-bit arcade cabinet. Teacher screen = scoreboard + board/question stage + monitor; student devices = one focused panel. */
   --bg:#12132b;
   --panel:#22305e;
   --ink:#f4f0e2;
@@ -25,75 +25,86 @@
 }
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
-body{
-  background:var(--bg);
-  color:var(--ink);
-  font-family:var(--font-body);
-  font-size:24px;
-  line-height:1.2;
-  -webkit-font-smoothing:none;
-}
-body::after{ /* CRT scanlines */
-  content:"";position:fixed;inset:0;pointer-events:none;z-index:50;
-  background:repeating-linear-gradient(to bottom,rgba(0,0,0,0) 0 2px,rgba(0,0,0,.18) 2px 4px);
-}
-#app{min-height:100%;max-width:1100px;margin:0 auto;padding:16px}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:24px;line-height:1.2;-webkit-font-smoothing:none}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;background:repeating-linear-gradient(to bottom,rgba(0,0,0,0) 0 2px,rgba(0,0,0,.18) 2px 4px)}
+#app{min-height:100%;max-width:1200px;margin:0 auto;padding:16px}
 .screen{display:none}
 .screen.active{display:flex;flex-direction:column;gap:16px}
 h1,h2,h3{font-family:var(--font-display);font-weight:400;margin:0;text-wrap:balance;letter-spacing:1px}
+p{margin:0}
 .px{border:4px solid var(--ink);box-shadow:6px 6px 0 var(--shadow)}
+.hint{color:var(--mute);font-size:22px}
+.err{color:var(--bad);font-size:22px;min-height:1.2em}
 
-button{
-  font-family:var(--font-display);font-size:14px;color:var(--bg);background:var(--ink);
-  border:4px solid var(--shadow);box-shadow:4px 4px 0 var(--shadow);
-  padding:12px 16px;cursor:pointer;text-transform:uppercase;
-}
+button{font-family:var(--font-display);font-size:14px;color:var(--bg);background:var(--ink);border:4px solid var(--shadow);box-shadow:4px 4px 0 var(--shadow);padding:12px 16px;cursor:pointer;text-transform:uppercase}
 button:hover{filter:brightness(1.12)}
 button:active{transform:translate(4px,4px);box-shadow:0 0 0 var(--shadow)}
 button:focus-visible,input:focus-visible{outline:4px dashed var(--phloem);outline-offset:3px}
-button:disabled{cursor:default}
+button:disabled{cursor:default;opacity:.5}
 .btn-go{background:var(--leaf)}
 .btn-small{font-size:10px;padding:8px 10px;background:var(--panel);color:var(--ink);border-color:var(--ink)}
+.btn-big{font-size:clamp(13px,2.4vw,18px);padding:18px 22px}
 
-/* ---------- Title ---------- */
-#screen-title{align-items:center;text-align:center;padding-top:8px}
 .logo{font-size:clamp(26px,7vw,56px);color:var(--leaf);text-shadow:4px 4px 0 var(--shadow),-2px -2px 0 #1b6b26}
 .logo span{color:var(--xylem)}
-.tag{font-family:var(--font-display);font-size:clamp(9px,2vw,13px);color:var(--phloem)}
+.tag{font-family:var(--font-display);font-size:clamp(9px,2vw,13px);color:var(--phloem);line-height:1.6}
+.center{align-items:center;text-align:center}
+
+/* home */
 #plant{width:192px;height:240px;image-rendering:pixelated;background:var(--bg)}
-.setup{background:var(--panel);padding:20px;display:grid;gap:16px;width:min(640px,100%);text-align:left}
-.field{display:flex;flex-direction:column;gap:6px}
-.field label,.legend{font-family:var(--font-display);font-size:10px}
-input[type=text]{
-  font-family:var(--font-body);font-size:24px;padding:4px 8px;background:var(--bg);color:var(--ink);
-  border:4px solid var(--ink);width:100%;text-transform:uppercase;min-width:0
-}
-.countrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.countrow output{font-family:var(--font-display);font-size:20px;min-width:3ch;text-align:center;color:var(--phloem)}
-.teamlist{display:grid;gap:8px;max-height:44vh;overflow:auto;padding:4px 6px 4px 0}
-.trow{display:grid;grid-template-columns:22px 1.3fr 1fr 1fr;gap:8px;align-items:center}
-.trow.head{font-family:var(--font-display);font-size:8px;color:var(--mute)}
-.sw{width:22px;height:22px;border:3px solid var(--shadow);background:var(--tc)}
-.clockpick{display:flex;gap:10px;flex-wrap:wrap}
-.clockpick input{position:absolute;opacity:0;width:1px;height:1px}
-.clockpick label{font-family:var(--font-display);font-size:11px;padding:10px 12px;border:4px solid var(--ink);cursor:pointer}
-.clockpick input:checked+label{background:var(--leaf);color:var(--bg)}
-.clockpick input:focus-visible+label{outline:4px dashed var(--phloem);outline-offset:3px}
-.how{width:min(640px,100%);text-align:left;font-size:22px;margin:0;padding:16px 20px 16px 36px;background:var(--shadow)}
+.homebtns{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+.how{width:min(680px,100%);text-align:left;font-size:22px;margin:0;padding:16px 20px 16px 36px;background:var(--shadow)}
 .how li{margin:4px 0}
 .how b{color:var(--phloem);font-weight:400}
 
-/* ---------- HUD ---------- */
+/* forms */
+.setup{background:var(--panel);padding:20px;display:grid;gap:16px;width:min(720px,100%);text-align:left}
+.field{display:flex;flex-direction:column;gap:6px}
+.field[hidden]{display:none}
+.field label,.legend{font-family:var(--font-display);font-size:10px;line-height:1.5}
+input[type=text]{font-family:var(--font-body);font-size:24px;padding:4px 8px;background:var(--bg);color:var(--ink);border:4px solid var(--ink);width:100%;text-transform:uppercase;min-width:0}
+input.code{font-family:var(--font-display);font-size:28px;letter-spacing:8px;text-align:center;padding:12px}
+.pick{display:flex;gap:10px;flex-wrap:wrap}
+.pick input{position:absolute;opacity:0;width:1px;height:1px}
+.pick label{font-family:var(--font-display);font-size:11px;padding:10px 12px;border:4px solid var(--ink);cursor:pointer;line-height:1.5}
+.pick input:checked+label{background:var(--leaf);color:var(--bg)}
+.pick input:focus-visible+label{outline:4px dashed var(--phloem);outline-offset:3px}
+.modehelp{font-size:21px;color:var(--mute)}
+.countrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.countrow output{font-family:var(--font-display);font-size:20px;min-width:3ch;text-align:center;color:var(--phloem)}
+.teamlist{display:grid;gap:8px;max-height:40vh;overflow:auto;padding:4px 6px 4px 0}
+.trow{display:grid;grid-template-columns:22px 1.3fr 1fr 1fr;gap:8px;align-items:center}
+.teamlist.noplayers .trow{grid-template-columns:22px 1fr}
+.teamlist.noplayers .pl{display:none}
+.trow.head{font-family:var(--font-display);font-size:8px;color:var(--mute)}
+.sw{width:22px;height:22px;border:3px solid var(--shadow);background:var(--tc);display:inline-block;flex:none}
+.rowbtns{display:flex;gap:12px;flex-wrap:wrap;justify-content:space-between}
+
+/* lobby */
+.lobbytop{display:grid;grid-template-columns:1fr auto;gap:20px;background:var(--panel);padding:20px;align-items:center}
+.bigcode{font-family:var(--font-display);font-size:clamp(34px,8vw,72px);color:var(--phloem);letter-spacing:6px;text-shadow:4px 4px 0 var(--shadow)}
+.joinurl{font-size:24px;overflow-wrap:anywhere;color:var(--xylem)}
+#qr{background:#fff;padding:8px;width:176px;height:176px}
+#qr img,#qr canvas{display:block;width:160px;height:160px;image-rendering:pixelated}
+.lobbylist{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.lteam{background:var(--panel);border-left:10px solid var(--tc);padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.lteam .nm{font-family:var(--font-display);font-size:11px;color:var(--tc);line-height:1.5}
+.lteam .who{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:22px}
+.kick{font-size:8px;padding:4px 6px;background:var(--bad);box-shadow:2px 2px 0 var(--shadow)}
+
+/* HUD */
 .topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 .topbar .logo{font-size:clamp(14px,3vw,22px)}
+.codechip{font-family:var(--font-display);font-size:11px;color:var(--phloem);background:var(--shadow);padding:8px 10px}
 .controls{display:flex;gap:8px;flex-wrap:wrap}
+.controls [hidden]{display:none}
 .scoreboard{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
 .team{background:var(--panel);padding:8px 10px;display:flex;flex-direction:column;gap:4px;border:4px solid var(--mute);border-left:10px solid var(--tc)}
 .team .name{font-family:var(--font-display);font-size:10px;line-height:1.4;overflow-wrap:anywhere;color:var(--tc)}
 .team .players{font-size:19px;color:var(--mute);overflow-wrap:anywhere}
 .team .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .team .score{font-family:var(--font-display);font-size:16px;font-variant-numeric:tabular-nums;color:var(--tc)}
-.team .clock{font-family:var(--font-display);font-size:11px;font-variant-numeric:tabular-nums;color:var(--ink)}
+.team .clock{font-family:var(--font-display);font-size:11px;font-variant-numeric:tabular-nums}
 .team .flag{font-family:var(--font-display);font-size:8px;min-height:8px;color:var(--mute)}
 .team.active{border-color:var(--tc);box-shadow:0 0 0 3px var(--shadow),0 0 0 7px var(--tc)}
 .team.active .flag{color:var(--leaf);animation:blink 1s steps(2) infinite}
@@ -101,70 +112,102 @@ input[type=text]{
 .team.out{opacity:.5}
 .team.out .flag{color:var(--bad)}
 @keyframes blink{50%{opacity:0}}
+.turnline{font-family:var(--font-display);font-size:clamp(9px,1.8vw,13px);text-align:center;min-height:1.5em;line-height:1.6}
 
-/* ---------- Board ---------- */
+/* board */
 .board{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
-.cat{
-  font-family:var(--font-display);font-size:clamp(7px,1.3vw,11px);line-height:1.5;text-align:center;
-  background:var(--leaf);color:var(--bg);padding:10px 4px;display:flex;align-items:center;justify-content:center;
-  min-height:64px;border:4px solid var(--shadow);overflow-wrap:anywhere
-}
-.cell{
-  font-size:clamp(12px,2.6vw,24px);background:var(--panel);color:var(--phloem);border-color:var(--shadow);
-  min-height:clamp(52px,9vw,80px);padding:4px;text-shadow:3px 3px 0 var(--shadow)
-}
-.cell:disabled{background:var(--shadow);color:var(--mute);box-shadow:none;transform:none;text-shadow:none;font-size:clamp(8px,1.4vw,12px);filter:none}
+.cat{font-family:var(--font-display);font-size:clamp(7px,1.3vw,11px);line-height:1.5;text-align:center;background:var(--leaf);color:var(--bg);padding:10px 4px;display:flex;align-items:center;justify-content:center;min-height:64px;border:4px solid var(--shadow);overflow-wrap:anywhere}
+.cell{font-size:clamp(12px,2.6vw,24px);background:var(--panel);color:var(--phloem);border-color:var(--shadow);min-height:clamp(52px,9vw,80px);padding:4px;text-shadow:3px 3px 0 var(--shadow)}
+.cell:disabled{background:var(--shadow);color:var(--mute);box-shadow:none;transform:none;text-shadow:none;font-size:clamp(7px,1.3vw,12px);filter:none;opacity:1}
 .cell.won{color:var(--tc)}
-.steal{display:flex;flex-direction:column;gap:12px;background:var(--shadow);padding:14px 16px;border-left:8px solid var(--phloem)}
-.steal[hidden]{display:none}
-.steal h3{font-size:14px;color:var(--phloem)}
-.steal p{margin:0}
-.stealbtns{display:flex;flex-wrap:wrap;gap:8px}
-.stealbtns button{font-size:10px;padding:8px 10px;background:var(--tc)}
-.stealbtns .nosteal{background:var(--mute)}
-.turnline{font-family:var(--font-display);font-size:clamp(9px,1.8vw,13px);text-align:center;min-height:1.5em}
+.board.readonly .cell:not(:disabled){cursor:default}
+.board.readonly .cell:not(:disabled):active{transform:none;box-shadow:4px 4px 0 var(--shadow)}
 
-/* ---------- Overlays ---------- */
-.overlay{position:fixed;inset:0;background:rgba(5,6,15,.92);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20;overflow:auto}
-.overlay[hidden]{display:none}
-.qbox{background:var(--panel);width:min(860px,100%);padding:20px;display:flex;flex-direction:column;gap:16px}
-.qhead{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-family:var(--font-display);font-size:11px}
+/* question */
+.qbox{background:var(--panel);width:100%;padding:20px;display:flex;flex-direction:column;gap:16px}
+.qbox[hidden]{display:none}
+.qhead{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-family:var(--font-display);font-size:11px;line-height:1.5}
 .qhead .qcat{color:var(--leaf)} .qhead .qval{color:var(--phloem)}
-.qteam{font-family:var(--font-display);font-size:11px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.qteam{font-family:var(--font-display);font-size:11px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;line-height:1.5}
 .qclock{font-variant-numeric:tabular-nums}
 .qclock.low{color:var(--bad);animation:blink .5s steps(2) infinite}
-.qtext{font-size:clamp(26px,3.4vw,34px);line-height:1.15;margin:0}
+.qtext{font-size:clamp(26px,3.4vw,34px);line-height:1.15}
 .opts{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.opt{
-  font-family:var(--font-body);font-size:clamp(22px,2.6vw,28px);text-transform:none;text-align:left;
-  background:var(--bg);color:var(--ink);border-color:var(--ink);display:flex;gap:12px;align-items:flex-start;line-height:1.1
-}
+.opt{font-family:var(--font-body);font-size:clamp(22px,2.6vw,28px);text-transform:none;text-align:left;background:var(--bg);color:var(--ink);border-color:var(--ink);display:flex;gap:12px;align-items:flex-start;line-height:1.1}
 .opt .k{font-family:var(--font-display);font-size:12px;color:var(--phloem);padding-top:4px;flex:none}
-.opt.right{background:var(--leaf);color:var(--bg)} .opt.right .k{color:var(--bg)}
-.opt.wrong{background:var(--bad);color:var(--bg)} .opt.wrong .k{color:var(--bg)}
+.opt.right{background:var(--leaf);color:var(--bg);opacity:1} .opt.right .k{color:var(--bg)}
+.opt.wrong{background:var(--bad);color:var(--bg);opacity:1} .opt.wrong .k{color:var(--bg)}
+.opts.readonly .opt{cursor:default}
+.opts.readonly .opt:active{transform:none;box-shadow:4px 4px 0 var(--shadow)}
 .opt:disabled:not(.right):not(.wrong){opacity:.45}
+.steal{display:flex;flex-direction:column;gap:12px;background:var(--shadow);padding:14px 16px;border-left:8px solid var(--phloem)}
+.steal[hidden],.feedback[hidden]{display:none}
+.steal h3{font-size:14px;color:var(--phloem);line-height:1.5}
+.stealbtns{display:flex;flex-wrap:wrap;gap:8px}
+.stealbtns button{font-size:10px;padding:8px 10px;background:var(--tc,var(--ink))}
+.stealbtns .nosteal{background:var(--mute)}
 .feedback{display:flex;flex-direction:column;gap:12px;background:var(--shadow);padding:14px 16px;border-left:8px solid var(--leaf)}
-.feedback[hidden]{display:none}
 .feedback.bad{border-left-color:var(--bad)}
-.feedback h3{font-size:16px}
+.feedback h3{font-size:16px;line-height:1.5}
 .feedback.good h3{color:var(--leaf)} .feedback.bad h3{color:var(--bad)}
-.feedback p{margin:0;font-size:26px}
+.feedback p{font-size:26px}
 .feedback button{align-self:flex-end}
-.center{text-align:center;align-items:center}
-#screen-end{align-items:center;text-align:center;padding-top:24px}
+
+/* teacher monitor */
+.monitor{display:grid;grid-template-columns:1.6fr 1fr;gap:16px}
+.monitor[hidden]{display:none}
+.mpanel{background:var(--shadow);padding:12px 14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.mpanel h3{font-size:11px;color:var(--leaf)}
+.tablewrap{overflow-x:auto}
+.mtable{width:100%;border-collapse:collapse;font-size:21px}
+.mtable th{font-family:var(--font-display);font-size:8px;color:var(--mute);text-align:left;padding:4px 6px;font-weight:400}
+.mtable td{padding:4px 6px;border-top:2px solid var(--panel);vertical-align:middle;font-variant-numeric:tabular-nums}
+.mtable .tn{color:var(--tc);display:flex;gap:8px;align-items:center}
+.on{color:var(--leaf)} .off{color:var(--bad)}
+.log{list-style:none;margin:0;padding:0;font-size:21px;display:flex;flex-direction:column;gap:2px;max-height:260px;overflow:auto}
+.log li .tm{color:var(--mute)}
+.peek{display:flex;gap:8px;align-items:center;font-size:21px}
+.peek input{width:20px;height:20px;accent-color:var(--leaf)}
+.peekans{color:var(--leaf);font-size:22px;min-height:1.2em}
+
+/* end */
 .trophy{width:160px;height:160px;image-rendering:pixelated}
-.final{display:grid;gap:8px;width:min(640px,100%);margin:0;padding:0;list-style:none}
+.final{display:grid;gap:8px;width:min(680px,100%);margin:0;padding:0;list-style:none}
 .final li{display:grid;grid-template-columns:3ch 1fr auto;gap:12px;align-items:center;background:var(--panel);padding:8px 12px;border-left:10px solid var(--tc);text-align:left}
 .final .pos{font-family:var(--font-display);font-size:12px;color:var(--mute)}
 .final .nm{font-family:var(--font-display);font-size:11px;color:var(--tc);line-height:1.5}
 .final .nm small{display:block;font-family:var(--font-body);font-size:20px;color:var(--mute)}
 .final .pts{font-family:var(--font-display);font-size:14px;font-variant-numeric:tabular-nums}
 .final li:first-child{box-shadow:0 0 0 3px var(--shadow),0 0 0 6px #ffd23f}
-.toast{position:fixed;left:50%;top:16px;transform:translateX(-50%);background:var(--bad);color:var(--bg);font-family:var(--font-display);font-size:12px;padding:12px 16px;z-index:40;border:4px solid var(--shadow)}
+.final li.me{outline:4px dashed var(--ink);outline-offset:2px}
+
+/* student device */
+.me{display:grid;grid-template-columns:1fr auto;gap:8px 16px;background:var(--panel);padding:10px 14px;border-left:10px solid var(--tc);align-items:center}
+.me .nm{font-family:var(--font-display);font-size:12px;color:var(--tc);line-height:1.5}
+.me .pl{font-size:20px;color:var(--mute)}
+.me .sc{font-family:var(--font-display);font-size:18px;color:var(--tc);text-align:right}
+.me .ck{font-family:var(--font-display);font-size:11px;text-align:right}
+.me .ck.low{color:var(--bad)}
+.pview{display:flex;flex-direction:column;gap:16px}
+.status{font-family:var(--font-display);font-size:clamp(10px,2.6vw,14px);text-align:center;line-height:1.7;padding:14px;background:var(--shadow)}
+.status.go{background:var(--leaf);color:var(--bg);animation:blink 1s steps(2) 3}
+.mini .cat{font-size:clamp(6px,1.8vw,9px);min-height:44px;padding:4px 2px}
+.mini .cell{font-size:clamp(10px,3vw,18px);min-height:48px}
+.buzzer{font-size:clamp(28px,9vw,56px);padding:clamp(28px,7vw,48px) 16px;background:var(--phloem);width:100%;animation:blink 1s steps(2) infinite}
+.teampick{display:grid;gap:10px}
+.teampick button{display:flex;justify-content:space-between;gap:12px;align-items:center;background:var(--panel);color:var(--ink);border-color:var(--tc);border-left:12px solid var(--tc);font-size:11px;text-align:left;line-height:1.5}
+.teampick .slots{color:var(--mute)}
+
+.overlay{position:fixed;inset:0;background:rgba(5,6,15,.92);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20;overflow:auto}
+.overlay[hidden]{display:none}
+.overlay .qbox{width:min(560px,100%)}
+.toast{position:fixed;left:50%;top:16px;transform:translateX(-50%);background:var(--phloem);color:var(--bg);font-family:var(--font-display);font-size:12px;padding:12px 16px;z-index:40;border:4px solid var(--shadow);max-width:calc(100% - 32px);text-align:center;line-height:1.5}
 .toast[hidden]{display:none}
 
+@media (max-width:800px){ .monitor{grid-template-columns:1fr} .lobbytop{grid-template-columns:1fr;justify-items:center;text-align:center} }
 @media (max-width:640px){
   body{font-size:22px}
+  #app{padding:12px}
   .opts{grid-template-columns:1fr}
   .trow{grid-template-columns:22px 1fr 1fr}
   .trow .tname{grid-column:2/-1}
@@ -173,32 +216,46 @@ input[type=text]{
   .board{gap:4px}
   .cat{min-height:56px;padding:6px 2px}
 }
-@media (prefers-reduced-motion:reduce){
-  *{animation:none !important}
-}
+@media (prefers-reduced-motion:reduce){ *{animation:none !important} }
 </style>
 </head>
 <body>
 <div id="app">
 
-  <!-- TITLE -->
-  <section id="screen-title" class="screen active">
+  <!-- HOME -->
+  <section id="screen-home" class="screen active center">
     <h1 class="logo">SAP <span>QUEST</span></h1>
     <p class="tag">PLANT TRANSPORT TRIVIA &middot; TEAMS OF 2</p>
     <canvas id="plant" width="32" height="40" aria-label="Pixel plant with water rising up the xylem and sugar moving down the phloem"></canvas>
+    <div class="homebtns">
+      <button type="button" class="btn-go btn-big" id="goHost">&#9654; I'M THE TEACHER</button>
+      <button type="button" class="btn-big" id="goJoin">&#9654; JOIN WITH A CODE</button>
+    </div>
+    <ol class="how">
+      <li>The <b>teacher</b> sets up the game and chooses a mode: one shared screen, a device per team, or a device per student.</li>
+      <li>Students join with the <b>6-digit code</b> on the teacher's screen.</li>
+      <li>Teams take turns picking a <b>topic</b> and <b>points</b>. Bigger points = harder questions.</li>
+      <li>Wrong answer? Other teams can <b>STEAL</b> it.</li>
+      <li>Each team has its <b>own clock</b>. At 0:00 your team is out.</li>
+    </ol>
+  </section>
+
+  <!-- TEACHER SETUP -->
+  <section id="screen-setup" class="screen center">
+    <h2 class="logo">GAME SETUP</h2>
     <form id="setup" class="setup px" autocomplete="off">
       <div class="field">
-        <span class="legend">NUMBER OF TEAMS (2-15)</span>
-        <div class="countrow">
-          <button type="button" class="btn-small" id="minusBtn" aria-label="Fewer teams">&minus;</button>
-          <output id="teamCount" aria-live="polite">4</output>
-          <button type="button" class="btn-small" id="plusBtn" aria-label="More teams">+</button>
+        <span class="legend">MODE</span>
+        <div class="pick" role="radiogroup" aria-label="Game mode">
+          <input type="radio" name="mode" id="mLocal" value="local"><label for="mLocal">ONE SCREEN</label>
+          <input type="radio" name="mode" id="mTeam" value="team" checked><label for="mTeam">DEVICE PER TEAM</label>
+          <input type="radio" name="mode" id="mStudent" value="student"><label for="mStudent">DEVICE PER STUDENT</label>
         </div>
+        <p class="modehelp" id="modeHelp"></p>
       </div>
-      <div class="teamlist" id="teamlist"></div>
       <div class="field">
         <span class="legend">TIME FOR EACH TEAM</span>
-        <div class="clockpick" role="radiogroup" aria-label="Time for each team">
+        <div class="pick" role="radiogroup" aria-label="Time for each team">
           <input type="radio" name="clock" id="clk3" value="180"><label for="clk3">3 MIN</label>
           <input type="radio" name="clock" id="clk5" value="300" checked><label for="clk5">5 MIN</label>
           <input type="radio" name="clock" id="clk8" value="480"><label for="clk8">8 MIN</label>
@@ -206,29 +263,55 @@ input[type=text]{
       </div>
       <div class="field">
         <span class="legend">ROUNDS</span>
-        <div class="clockpick" role="radiogroup" aria-label="Number of rounds">
+        <div class="pick" role="radiogroup" aria-label="Number of rounds">
           <input type="radio" name="rounds" id="rnd1" value="1"><label for="rnd1">1 ROUND (25 Q)</label>
           <input type="radio" name="rounds" id="rnd2" value="2" checked><label for="rnd2">2 ROUNDS (50 Q)</label>
         </div>
       </div>
-      <button type="submit" class="btn-go" id="startBtn">&#9654; PRESS START</button>
+      <div class="field" id="countField">
+        <span class="legend">NUMBER OF TEAMS (2-15)</span>
+        <div class="countrow">
+          <button type="button" class="btn-small" id="minusBtn" aria-label="Fewer teams">&minus;</button>
+          <output id="teamCount" aria-live="polite">4</output>
+          <button type="button" class="btn-small" id="plusBtn" aria-label="More teams">+</button>
+        </div>
+        <div class="teamlist" id="teamlist"></div>
+      </div>
+      <div class="rowbtns">
+        <button type="button" class="btn-small" id="setupBack">&#9664; BACK</button>
+        <button type="submit" class="btn-go" id="startBtn">&#9654; CREATE ROOM</button>
+      </div>
     </form>
-    <ol class="how">
-      <li>Each team has <b>2 players</b>. Teams take turns picking a <b>topic</b> and a <b>point value</b>.</li>
-      <li>Bigger points = <b>harder questions</b>. 100 is easy, 500 is a boss level.</li>
-      <li>Wrong answer? Another team can <b>STEAL</b> the question and win the points.</li>
-      <li>Each team has its <b>own clock</b>. It only runs while that team is picking or answering.</li>
-      <li>If your clock hits 0:00 you are out. Everyone else keeps playing.</li>
-      <li>Answer with a click or press keys <b>1-4</b>. Most points wins!</li>
-    </ol>
   </section>
 
-  <!-- GAME -->
+  <!-- TEACHER LOBBY -->
+  <section id="screen-lobby" class="screen">
+    <div class="lobbytop px">
+      <div class="field">
+        <span class="legend">GO TO THIS LINK AND ENTER THE CODE</span>
+        <p class="joinurl" id="joinUrl">Connecting...</p>
+        <div class="bigcode" id="bigCode">------</div>
+        <p class="hint" id="lobbyHelp"></p>
+        <p class="err" id="lobbyErr"></p>
+      </div>
+      <div id="qr" aria-label="QR code for the join link"></div>
+    </div>
+    <h3 class="tag" id="lobbyCount">WAITING FOR TEAMS...</h3>
+    <div class="lobbylist" id="lobbyList"></div>
+    <div class="rowbtns">
+      <button type="button" class="btn-small" id="lobbyCancel">&#9664; CANCEL</button>
+      <button type="button" class="btn-go" id="lobbyStart" disabled>&#9654; START GAME</button>
+    </div>
+  </section>
+
+  <!-- TEACHER GAME -->
   <section id="screen-game" class="screen">
     <header class="topbar">
       <h2 class="logo">SAP <span>QUEST</span></h2>
+      <span class="codechip" id="codeChip" hidden></span>
       <div class="controls">
         <button type="button" class="btn-small" id="pauseBtn">PAUSE</button>
+        <button type="button" class="btn-small" id="skipBtn" hidden>SKIP TURN</button>
         <button type="button" class="btn-small" id="musicBtn" aria-pressed="true">MUSIC ON</button>
         <button type="button" class="btn-small" id="sfxBtn" aria-pressed="true">SFX ON</button>
       </div>
@@ -236,43 +319,97 @@ input[type=text]{
     <div class="scoreboard" id="scoreboard"></div>
     <p class="turnline" id="turnline"></p>
     <div class="board" id="board" role="grid" aria-label="Question board"></div>
+    <div class="qbox px" id="qpanel" hidden>
+      <div class="qhead"><span class="qcat" id="qcat"></span><span class="qval" id="qval"></span></div>
+      <div class="qteam"><span id="qteam"></span><span class="qclock" id="qclock"></span></div>
+      <p class="qtext" id="qtext"></p>
+      <div class="opts" id="opts"></div>
+      <div class="steal" id="steal" hidden aria-live="polite">
+        <h3 id="stealTitle">WRONG! STEAL CHANCE!</h3>
+        <p id="stealInfo"></p>
+        <div class="stealbtns" id="stealbtns"></div>
+      </div>
+      <div class="feedback" id="feedback" hidden aria-live="polite">
+        <h3 id="fbTitle"></h3>
+        <p id="fbText"></p>
+        <button type="button" class="btn-go" id="nextBtn">NEXT TURN &#9654;</button>
+      </div>
+    </div>
+    <div class="monitor" id="monitor" hidden>
+      <div class="mpanel">
+        <h3>TEACHER MONITOR</h3>
+        <div class="tablewrap"><table class="mtable"><thead><tr><th>TEAM</th><th>DEVICE</th><th>SCORE</th><th>RIGHT</th><th>STEALS</th><th>TIME</th><th>LAST</th></tr></thead><tbody id="mbody"></tbody></table></div>
+        <label class="peek" for="peekChk"><input type="checkbox" id="peekChk"> Show the correct answer here (keep off if this screen is projected)</label>
+        <p class="peekans" id="peekAns"></p>
+      </div>
+      <div class="mpanel">
+        <h3>LIVE ACTIVITY</h3>
+        <ul class="log" id="log"></ul>
+      </div>
+    </div>
   </section>
 
-  <!-- END -->
-  <section id="screen-end" class="screen">
+  <!-- TEACHER END -->
+  <section id="screen-end" class="screen center">
     <h2 class="logo" id="winTitle">GAME OVER</h2>
     <canvas class="trophy" id="trophy" width="16" height="16" aria-hidden="true"></canvas>
     <p class="tag" id="winSub"></p>
     <ol class="final" id="final"></ol>
-    <button type="button" class="btn-go" id="againBtn">&#9654; PLAY AGAIN</button>
+    <button type="button" class="btn-go" id="againBtn">&#9654; NEW GAME</button>
+  </section>
+
+  <!-- STUDENT JOIN -->
+  <section id="screen-join" class="screen center">
+    <h2 class="logo">JOIN <span>GAME</span></h2>
+    <form id="joinCodeForm" class="setup px" autocomplete="off">
+      <div class="field">
+        <label for="codeIn">GAME CODE</label>
+        <input type="text" id="codeIn" class="code" inputmode="numeric" maxlength="6" placeholder="000000">
+      </div>
+      <p class="err" id="joinErr" aria-live="polite"></p>
+      <div class="rowbtns">
+        <button type="button" class="btn-small" id="joinBack">&#9664; BACK</button>
+        <button type="submit" class="btn-go" id="joinBtn">&#9654; JOIN</button>
+      </div>
+    </form>
+    <form id="joinTeamForm" class="setup px" autocomplete="off" hidden>
+      <div class="field" id="jfTeam">
+        <label for="jTeam">TEAM NAME</label>
+        <input type="text" id="jTeam" maxlength="14">
+      </div>
+      <div class="field" id="jfP1">
+        <label for="jP1" id="jP1Label">PLAYER 1</label>
+        <input type="text" id="jP1" maxlength="12">
+      </div>
+      <div class="field" id="jfP2">
+        <label for="jP2">PLAYER 2</label>
+        <input type="text" id="jP2" maxlength="12">
+      </div>
+      <div class="field" id="jfPick" hidden>
+        <span class="legend">TAP YOUR TEAM (2 PLAYERS EACH)</span>
+        <div class="teampick" id="teamPick"></div>
+      </div>
+      <p class="err" id="joinErr2" aria-live="polite"></p>
+      <button type="submit" class="btn-go" id="joinTeamBtn">&#9654; JOIN TEAM</button>
+    </form>
+  </section>
+
+  <!-- STUDENT PLAY -->
+  <section id="screen-play" class="screen">
+    <div class="me" id="meBar">
+      <div><div class="nm" id="meName"></div><div class="pl" id="mePlayers"></div></div>
+      <div><div class="sc" id="meScore">0</div><div class="ck" id="meClock"></div></div>
+    </div>
+    <div class="pview" id="pview"></div>
+    <div class="controls" style="justify-content:center"><button type="button" class="btn-small" id="cSfxBtn" aria-pressed="true">SFX ON</button></div>
   </section>
 </div>
 
-<!-- QUESTION -->
-<div class="overlay" id="qmodal" hidden role="dialog" aria-modal="true" aria-labelledby="qtext">
-  <div class="qbox px">
-    <div class="qhead"><span class="qcat" id="qcat"></span><span class="qval" id="qval"></span></div>
-    <div class="qteam"><span id="qteam"></span><span class="qclock" id="qclock"></span></div>
-    <p class="qtext" id="qtext"></p>
-    <div class="opts" id="opts"></div>
-    <div class="steal" id="steal" hidden aria-live="polite">
-      <h3 id="stealTitle">WRONG! STEAL CHANCE!</h3>
-      <p>Which team wants to steal? Their own clock runs while they answer.</p>
-      <div class="stealbtns" id="stealbtns"></div>
-    </div>
-    <div class="feedback" id="feedback" hidden aria-live="polite">
-      <h3 id="fbTitle"></h3>
-      <p id="fbText"></p>
-      <button type="button" class="btn-go" id="nextBtn">NEXT TURN &#9654;</button>
-    </div>
-  </div>
-</div>
-
-<!-- PAUSE -->
+<!-- PAUSE (teacher) -->
 <div class="overlay" id="pauseModal" hidden role="dialog" aria-modal="true" aria-labelledby="pauseTitle">
   <div class="qbox px center">
     <h2 id="pauseTitle" class="logo">PAUSED</h2>
-    <p>Both clocks are stopped.</p>
+    <p>All clocks are stopped.</p>
     <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
       <button type="button" class="btn-go" id="resumeBtn">RESUME</button>
       <button type="button" id="quitBtn">END GAME NOW</button>
@@ -282,6 +419,8 @@ input[type=text]{
 
 <div class="toast" id="toast" hidden></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 /* ================= QUESTIONS =================
    5 topics x 5 levels, 2 questions per slot (one is picked at random each game).
@@ -439,7 +578,7 @@ function drawPlant(frame){
 }
 let plantFrame=0;
 drawPlant(0);
-if(!reduceMotion) setInterval(()=>{ if(document.getElementById("screen-title").classList.contains("active")) drawPlant(++plantFrame); },110);
+if(!reduceMotion) setInterval(()=>{ if(document.getElementById("screen-home").classList.contains("active")) drawPlant(++plantFrame); },110);
 
 function drawTrophy(){
   const c=document.getElementById("trophy"), g=c.getContext("2d");
@@ -449,93 +588,386 @@ function drawTrophy(){
   map.forEach((row,y)=>[...row].forEach((ch,x)=>{if(col[ch]){g.fillStyle=col[ch];g.fillRect(x,y,1,1)}}));
 }
 
-/* ================= GAME ================= */
+/* ================= SHARED ================= */
 const $=id=>document.getElementById(id);
 const COLORS=["#3fa9f5","#ffb020","#3ccf4e","#ff6fae","#b98cff","#ff4d5e","#2ee6d6","#ffe14d","#ff8a3d","#8fd16a","#6f8cff","#e8e8e8","#d97a4a","#c6f05a","#f07aff"];
 const DEFAULT_NAMES=["XYLEM","PHLOEM","STOMATA","ROOT HAIRS","GUARD CELLS","SIEVE TUBES","MESOPHYLL","LIGNIN","OSMOSIS","CACTI","CELERY","POTOMETER","SUCROSE","APHIDS","LEAF VEINS"];
-const S={teams:[],turn:0,ans:0,phase:"title",paused:false,used:0,cur:null,round:1,rounds:2,qorder:[]};
-
-function show(id){ document.querySelectorAll(".screen").forEach(s=>s.classList.toggle("active",s.id===id)); }
-const fmt=t=>{const s=Math.ceil(t);return Math.floor(s/60)+":"+String(s%60).padStart(2,"0")};
-function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
-let toastT; function toast(msg){const t=$("toast");t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2600)}
+const SHORT=["ROOTS","XYLEM","PHLOEM","TRANSPIR- ATION","EXPERI- MENTS"];
+const PEER_PREFIX="sapquest-v1-";
+const STEAL_WINDOW=10;
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const clean=(s,n)=>String(s==null?"":s).replace(/[\u0000-\u001f]/g,"").trim().toUpperCase().slice(0,n);
+const fmt=t=>{const s=Math.max(0,Math.ceil(t));return Math.floor(s/60)+":"+String(s%60).padStart(2,"0")};
 const playersOf=t=>t.players.filter(Boolean).join(" & ");
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function show(id){ document.querySelectorAll(".screen").forEach(s=>s.classList.toggle("active",s.id===id)); window.scrollTo(0,0); }
+let toastT; function toast(msg){const t=$("toast");t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,3000)}
+const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+function rankOf(teams){
+  const r=teams.map((t,i)=>({t,i})).sort((a,b)=>b.t.score-a.t.score);
+  let pos=0; r.forEach((x,k)=>{ if(k===0||x.t.score!==r[k-1].t.score) pos=k+1; x.pos=pos; }); return r;
+}
+function boardHTML(board,clickable){
+  let h=TOPICS.map((t,i)=>'<div class="cat" role="columnheader">'+esc(clickable==="mini"?SHORT[i]:t.name)+'</div>').join("");
+  VALUES.forEach((v,li)=>TOPICS.forEach((t,ti)=>{
+    const idx=li*5+ti, c=board[idx];
+    if(c.s==="open") h+='<button type="button" class="cell" data-idx="'+idx+'" aria-label="'+esc(t.name)+' for '+v+' points">'+v+'</button>';
+    else h+='<button type="button" class="cell'+(c.s==="won"?" won":"")+'" disabled style="--tc:'+(c.color||"")+'">'+esc(c.s==="won"?c.label:"MISSED")+'</button>';
+  }));
+  return h;
+}
 
-/* ---------- setup: 2-15 teams of 2 players ---------- */
+/* home */
+$("goHost").addEventListener("click",()=>{ Audio8.init(); sfx.select(); show("screen-setup"); });
+$("goJoin").addEventListener("click",()=>{ Audio8.init(); sfx.select(); show("screen-join"); $("codeIn").focus(); });
+
+/* ================= TEACHER (HOST) ================= */
+const S={mode:"team",phase:"setup",teams:[],turn:0,ans:0,used:0,round:1,rounds:2,secs:300,qorder:[],board:[],cur:null,paused:false,stealLeft:0,log:[],code:"",peer:null,clients:new Map()};
+const isDevices=()=>S.mode!=="local";
+
+/* ---------- setup ---------- */
 let setupCount=4; const saved=[];
+const MODE_HELP={
+  local:"Everyone plays on this screen. Teams take turns using it.",
+  team:"Each team of 2 joins on one phone, tablet or laptop with the code and types their team name.",
+  student:"Every student joins on their own device and taps a team. Either teammate can answer for the team."
+};
+function curMode(){return document.querySelector("input[name=mode]:checked").value}
 function renderSetup(){
-  const list=$("teamlist");
+  const list=$("teamlist"), mode=curMode();
   list.querySelectorAll(".trow[data-i]").forEach(r=>{saved[+r.dataset.i]=[...r.querySelectorAll("input")].map(x=>x.value)});
-  list.innerHTML='<div class="trow head" aria-hidden="true"><span></span><span>TEAM NAME</span><span>PLAYER 1</span><span>PLAYER 2</span></div>';
+  list.classList.toggle("noplayers",mode==="student");
+  list.innerHTML='<div class="trow head" aria-hidden="true"><span></span><span>TEAM NAME</span><span class="pl">PLAYER 1</span><span class="pl">PLAYER 2</span></div>';
   for(let i=0;i<setupCount;i++){
     const v=saved[i]||[DEFAULT_NAMES[i],"",""];
     const r=document.createElement("div"); r.className="trow"; r.dataset.i=i; r.style.setProperty("--tc",COLORS[i]);
     r.innerHTML='<span class="sw"></span>'+
       '<input class="tname" type="text" id="tn'+i+'" maxlength="14" aria-label="Team '+(i+1)+' name">'+
-      '<input type="text" id="pa'+i+'" maxlength="12" placeholder="PLAYER 1" aria-label="Team '+(i+1)+' player 1">'+
-      '<input type="text" id="pb'+i+'" maxlength="12" placeholder="PLAYER 2" aria-label="Team '+(i+1)+' player 2">';
+      '<input class="pl" type="text" id="pa'+i+'" maxlength="12" placeholder="PLAYER 1" aria-label="Team '+(i+1)+' player 1">'+
+      '<input class="pl" type="text" id="pb'+i+'" maxlength="12" placeholder="PLAYER 2" aria-label="Team '+(i+1)+' player 2">';
     r.querySelectorAll("input").forEach((x,k)=>x.value=v[k]);
     list.appendChild(r);
   }
   $("teamCount").textContent=setupCount;
   $("minusBtn").disabled=setupCount<=2; $("plusBtn").disabled=setupCount>=15;
+  $("countField").hidden=mode==="team";
+  $("modeHelp").textContent=MODE_HELP[mode];
+  $("startBtn").innerHTML=mode==="local"?"&#9654; START GAME":"&#9654; CREATE ROOM";
 }
+document.querySelectorAll("input[name=mode]").forEach(r=>r.addEventListener("change",()=>{renderSetup();sfx.select();}));
 $("minusBtn").addEventListener("click",()=>{if(setupCount>2){setupCount--;renderSetup();sfx.select();}});
-$("plusBtn").addEventListener("click",()=>{if(setupCount<15){setupCount++;renderSetup();sfx.select();$("teamlist").lastChild.querySelector("input").focus();}});
+$("plusBtn").addEventListener("click",()=>{if(setupCount<15){setupCount++;renderSetup();sfx.select();}});
+$("setupBack").addEventListener("click",()=>show("screen-home"));
 renderSetup();
+
+function newTeam(name,players,i){return {name,players,color:COLORS[i%15],score:0,time:S.secs,right:0,steals:0,out:false,last:""}}
 
 $("setup").addEventListener("submit",e=>{
   e.preventDefault();
   Audio8.init(); Audio8.resume();
-  const secs=+document.querySelector("input[name=clock]:checked").value;
-  S.teams=[];
-  for(let i=0;i<setupCount;i++){
-    S.teams.push({
-      name:($("tn"+i).value.trim()||("TEAM "+(i+1))).toUpperCase(),
-      players:[$("pa"+i).value.trim().toUpperCase(),$("pb"+i).value.trim().toUpperCase()],
-      color:COLORS[i],score:0,time:secs,right:0,steals:0,out:false
-    });
+  S.mode=curMode();
+  S.secs=+document.querySelector("input[name=clock]:checked").value;
+  S.rounds=+document.querySelector("input[name=rounds]:checked").value;
+  S.teams=[]; S.log=[]; S.clients=new Map();
+  if(S.mode!=="team") for(let i=0;i<setupCount;i++){
+    const name=clean($("tn"+i).value,14)||("TEAM "+(i+1));
+    S.teams.push(newTeam(name,S.mode==="local"?[clean($("pa"+i).value,12),clean($("pb"+i).value,12)]:[],i));
   }
-  Object.assign(S,{turn:Math.floor(Math.random()*S.teams.length),paused:false,used:0,cur:null,round:1,
-    rounds:+document.querySelector("input[name=rounds]:checked").value,
-    qorder:TOPICS.map(t=>t.levels.map(()=>Math.random()<.5?[0,1]:[1,0]))});
-  S.ans=S.turn;
-  buildBoard(); buildScoreboard(); show("screen-game"); S.phase="board";
-  sfx.select(); Audio8.setThinking(false); Audio8.startMusic();
-  renderHUD();
-  toast(S.teams[S.turn].name+" GOES FIRST!");
-  last=performance.now();
+  if(S.mode==="local") startGame(); else openRoom();
 });
 
-function buildBoard(){
-  const b=$("board"); b.innerHTML="";
-  TOPICS.forEach(t=>{const d=document.createElement("div");d.className="cat";d.setAttribute("role","columnheader");d.textContent=t.name;b.appendChild(d)});
-  VALUES.forEach((v,li)=>TOPICS.forEach((t,ti)=>{
-    const btn=document.createElement("button");
-    btn.type="button"; btn.className="cell"; btn.textContent=v;
-    btn.setAttribute("aria-label",t.name+" for "+v+" points");
-    btn.addEventListener("click",()=>openQ(ti,li,btn));
-    b.appendChild(btn);
-  }));
+/* ---------- networking (PeerJS: the teacher's browser is the game server) ---------- */
+function send(conn,msg){ try{ if(conn&&conn.open) conn.send(msg); }catch(e){} }
+function openRoom(){
+  S.phase="lobby";
+  show("screen-lobby");
+  $("lobbyErr").textContent=""; $("bigCode").textContent="------"; $("joinUrl").textContent="Connecting..."; $("qr").innerHTML="";
+  $("lobbyHelp").textContent=S.mode==="team"?"Each team of 2 joins on ONE device.":"Every student joins on their own device and taps a team.";
+  if(typeof Peer==="undefined"){ $("lobbyErr").textContent="Could not load the connection library. Check the internet connection, then reload the page."; return; }
+  const code=String(Math.floor(100000+Math.random()*900000));
+  if(S.peer){ try{S.peer.destroy()}catch(e){} }
+  const peer=new Peer(PEER_PREFIX+code); S.peer=peer;
+  peer.on("open",()=>{
+    S.code=code;
+    const url=location.origin+location.pathname+"?code="+code;
+    $("bigCode").textContent=code; $("joinUrl").textContent=location.host+location.pathname;
+    $("codeChip").textContent="CODE "+code;
+    $("qr").innerHTML="";
+    if(typeof QRCode!=="undefined"){ try{ new QRCode($("qr"),{text:url,width:160,height:160,correctLevel:QRCode.CorrectLevel.M}); }catch(e){} }
+    renderLobby();
+  });
+  peer.on("connection",conn=>{
+    conn.on("data",m=>onClientMsg(conn,m));
+    conn.on("close",()=>onClientClose(conn));
+    conn.on("error",()=>onClientClose(conn));
+  });
+  peer.on("disconnected",()=>{ try{peer.reconnect()}catch(e){} });
+  peer.on("error",err=>{
+    if(err.type==="unavailable-id") return openRoom();
+    if(err.type==="peer-unavailable") return;
+    $("lobbyErr").textContent="Connection problem ("+err.type+"). Check the internet connection and press CANCEL, then try again.";
+    if(S.phase!=="lobby") toast("CONNECTION PROBLEM: "+err.type);
+  });
+  renderLobby();
 }
 
+function addLog(text){
+  const d=new Date(); S.log.unshift({tm:d.toTimeString().slice(0,5),text}); S.log.length=Math.min(S.log.length,40);
+  renderLog();
+}
+function membersOf(i){ return [...S.clients.values()].filter(c=>c.team===i); }
+function teamOnline(i){ return membersOf(i).some(c=>c.online); }
+
+function onClientMsg(conn,m){
+  if(!m||typeof m!=="object") return;
+  if(m.t==="hello"){
+    const cid=String(m.cid||"").slice(0,40); if(!cid) return;
+    conn.cid=cid;
+    const c=S.clients.get(cid);
+    if(c){ c.conn=conn; c.online=true; send(conn,{t:"welcome",mode:S.mode,joined:c.team>=0}); if(c.team>=0&&S.phase!=="lobby") addLog((c.name||S.teams[c.team].name)+" reconnected"); }
+    else{
+      if(S.phase!=="lobby") return send(conn,{t:"reject",msg:"This game has already started. Ask your teacher to start a new one."});
+      S.clients.set(cid,{cid,conn,team:-1,name:"",online:true});
+      send(conn,{t:"welcome",mode:S.mode,joined:false});
+    }
+    renderLobby(); broadcast(); return;
+  }
+  const c=S.clients.get(conn.cid); if(!c) return;
+  if(m.t==="join"){
+    if(S.phase!=="lobby"||c.team>=0) return;
+    if(S.mode==="team"){
+      if(S.teams.length>=15) return send(conn,{t:"joinerr",msg:"This game is full (15 teams)."});
+      let base=clean(m.team,14)||("TEAM "+(S.teams.length+1)), name=base, n=2;
+      while(S.teams.some(t=>t.name===name)) name=base.slice(0,12)+" "+(n++);
+      const p=[clean(m.p1,12),clean(m.p2,12)];
+      S.teams.push(newTeam(name,p,S.teams.length));
+      c.team=S.teams.length-1; c.name=name;
+      addLog(name+" joined");
+    } else {
+      const ti=+m.team, nm=clean(m.name,12);
+      if(!nm) return send(conn,{t:"joinerr",msg:"Type your name first."});
+      if(!(ti>=0&&ti<S.teams.length)) return;
+      if(membersOf(ti).length>=2) return send(conn,{t:"joinerr",msg:"That team is full. Pick another team."});
+      c.team=ti; c.name=nm; S.teams[ti].players=membersOf(ti).map(x=>x.name);
+      addLog(nm+" joined "+S.teams[ti].name);
+    }
+    send(conn,{t:"joined"}); sfx.select();
+    renderLobby(); broadcast(); return;
+  }
+  if(c.team<0) return;
+  if(m.t==="pick") doPick(c.team,+m.idx);
+  else if(m.t==="answer") doAnswer(c.team,+m.i);
+  else if(m.t==="buzz") doBuzz(c.team);
+}
+function onClientClose(conn){
+  const c=conn.cid&&S.clients.get(conn.cid); if(!c||c.conn!==conn) return;
+  c.online=false;
+  if(S.phase==="lobby"&&c.team<0) S.clients.delete(c.cid);
+  else if(c.team>=0&&S.phase!=="lobby") addLog((S.mode==="student"?c.name:S.teams[c.team].name)+" lost connection");
+  renderLobby(); renderMonitor(); broadcast();
+}
+
+function kick(cid){
+  const c=S.clients.get(cid); if(!c) return;
+  send(c.conn,{t:"kicked"});
+  setTimeout(()=>{try{c.conn.close()}catch(e){}},300);
+  const ti=c.team; S.clients.delete(cid);
+  if(S.mode==="team"&&ti>=0){
+    S.teams.splice(ti,1);
+    S.clients.forEach(x=>{ if(x.team>ti) x.team--; });
+    S.teams.forEach((t,i)=>t.color=COLORS[i]);
+  } else if(ti>=0) S.teams[ti].players=membersOf(ti).map(x=>x.name);
+  renderLobby(); broadcast();
+}
+
+function renderLobby(){
+  if(S.phase!=="lobby") return;
+  const list=$("lobbyList"); let h="";
+  S.teams.forEach((t,i)=>{
+    const mem=membersOf(i);
+    h+='<div class="lteam" style="--tc:'+t.color+'"><div class="nm">'+esc(t.name)+'</div>';
+    if(S.mode==="team"){
+      const c=mem[0];
+      h+='<div class="who"><span>'+esc(playersOf(t)||"(no names)")+'</span>'+(c?'<button type="button" class="kick" data-cid="'+esc(c.cid)+'">REMOVE</button>':'')+'</div>';
+    } else {
+      if(!mem.length) h+='<div class="who hint">waiting for players...</div>';
+      mem.forEach(c=>{ h+='<div class="who"><span class="'+(c.online?"":"off")+'">'+esc(c.name)+'</span><button type="button" class="kick" data-cid="'+esc(c.cid)+'">REMOVE</button></div>'; });
+    }
+    h+='</div>';
+  });
+  list.innerHTML=h;
+  const ready=S.mode==="team"?S.teams.length:S.teams.filter((t,i)=>membersOf(i).length).length;
+  const players=[...S.clients.values()].filter(c=>c.team>=0).length;
+  $("lobbyCount").textContent=S.mode==="team"?ready+" TEAM"+(ready===1?"":"S")+" JOINED":players+" PLAYER"+(players===1?"":"S")+" JOINED · "+ready+" TEAMS READY";
+  $("lobbyStart").disabled=ready<2;
+}
+$("lobbyList").addEventListener("click",e=>{ const b=e.target.closest(".kick"); if(b) kick(b.dataset.cid); });
+$("lobbyCancel").addEventListener("click",()=>{
+  S.clients.forEach(c=>send(c.conn,{t:"kicked",msg:"The teacher closed the game."}));
+  setTimeout(()=>{ try{S.peer&&S.peer.destroy()}catch(e){} S.peer=null; },300);
+  S.phase="setup"; show("screen-setup");
+});
+$("lobbyStart").addEventListener("click",()=>{
+  if(S.mode==="student"){
+    // drop empty teams and re-number
+    const keep=S.teams.map((t,i)=>membersOf(i).length?i:-1).filter(i=>i>=0);
+    const map=new Map(keep.map((old,ni)=>[old,ni]));
+    S.teams=keep.map(i=>S.teams[i]);
+    S.clients.forEach(c=>{ c.team=map.has(c.team)?map.get(c.team):-1; });
+    S.teams.forEach((t,i)=>t.color=COLORS[i]);
+  }
+  startGame();
+});
+
+/* ---------- game engine (runs on the teacher's device only) ---------- */
+function startGame(){
+  S.teams.forEach(t=>Object.assign(t,{score:0,time:S.secs,right:0,steals:0,out:false,last:""}));
+  Object.assign(S,{turn:Math.floor(Math.random()*S.teams.length),used:0,round:1,cur:null,paused:false,
+    qorder:TOPICS.map(t=>t.levels.map(()=>Math.random()<.5?[0,1]:[1,0]))});
+  S.ans=S.turn; resetBoard();
+  S.phase="board";
+  show("screen-game");
+  $("monitor").hidden=!isDevices(); $("skipBtn").hidden=!isDevices(); $("codeChip").hidden=!isDevices();
+  $("board").classList.toggle("readonly",isDevices());
+  $("opts").classList.toggle("readonly",isDevices());
+  buildScoreboard();
+  Audio8.setThinking(false); Audio8.startMusic(); sfx.select();
+  addLog("Game started with "+S.teams.length+" teams");
+  renderAll(); broadcast();
+  toast(S.teams[S.turn].name+" GOES FIRST!");
+  last=performance.now();
+}
+function resetBoard(){ S.board=Array.from({length:25},()=>({s:"open",by:null,label:"",color:""})); S.used=0; }
+
+const activeTeam=()=>S.phase==="board"?S.turn:S.ans;
+const eligibleStealers=()=>S.cur?S.teams.map((t,i)=>i).filter(i=>!S.teams[i].out&&!S.cur.tried.includes(i)):[];
+
+function doPick(team,idx){
+  if(S.phase!=="board"||S.paused||team!==S.turn) return;
+  if(!(idx>=0&&idx<25)||S.board[idx].s!=="open") return;
+  const ti=idx%5, li=Math.floor(idx/5);
+  const raw=TOPICS[ti].levels[li][S.qorder[ti][li][S.round-1]];
+  const order=shuffle([0,1,2,3]);
+  S.ans=S.turn;
+  S.cur={idx,ti,li,q:raw,opts:order.map(i=>raw.a[i]),ans:order.indexOf(0),value:VALUES[li],tried:[S.turn],wrong:[],stealing:false,winner:null,reveal:false,t0:performance.now()};
+  S.phase="question"; Audio8.setThinking(true); sfx.select();
+  addLog(S.teams[team].name+" picked "+TOPICS[ti].name+" "+VALUES[li]);
+  renderAll(); broadcast();
+}
+function doAnswer(team,i,timedOut){
+  if(S.phase!=="question"||team!==S.ans) return;
+  if(!timedOut&&(S.paused||!(i>=0&&i<4)||S.cur.wrong.includes(i))) return;
+  const c=S.cur, t=S.teams[team], secs=Math.round((performance.now()-c.t0)/1000);
+  if(!timedOut&&i===c.ans){
+    t.score+=c.value; t.right++; if(c.stealing) t.steals++; t.last="✓";
+    sfx.correct(); addLog(t.name+(c.stealing?" STOLE it":" answered correctly")+" (+"+c.value+", "+secs+"s)");
+    return finish(team);
+  }
+  t.last=timedOut?"⏱":"✗";
+  if(timedOut) addLog(t.name+" ran out of time"); else { sfx.wrong(); c.wrong.push(i); addLog(t.name+" answered "+"ABCD"[i]+" - wrong ("+secs+"s)"); }
+  offerSteal(timedOut);
+}
+function offerSteal(timedOut){
+  const c=S.cur, el=eligibleStealers();
+  if(!el.length||4-c.wrong.length<=1) return finish(null);
+  S.phase="steal"; S.stealLeft=STEAL_WINDOW; c.timedOut=!!timedOut; Audio8.setThinking(false);
+  renderAll(); broadcast();
+}
+function doBuzz(team){
+  if(S.phase!=="steal"||S.paused||!eligibleStealers().includes(team)) return;
+  const c=S.cur; c.tried.push(team); c.stealing=true; c.t0=performance.now(); S.ans=team;
+  S.phase="question"; Audio8.setThinking(true); sfx.select();
+  addLog(S.teams[team].name+" is trying to steal");
+  renderAll(); broadcast(); last=performance.now();
+}
+function finish(winner){
+  const c=S.cur; if(!c) return;
+  S.phase="feedback"; c.winner=winner; c.reveal=true; Audio8.setThinking(false);
+  const cell=S.board[c.idx];
+  if(winner!=null){ const t=S.teams[winner]; Object.assign(cell,{s:"won",by:winner,label:t.name.slice(0,8)+" +"+c.value,color:t.color}); }
+  else { cell.s="missed"; addLog("Nobody got it. Answer: "+c.opts[c.ans]); }
+  S.used++;
+  renderAll(); broadcast();
+}
+const boardDone=()=>S.used>=25;
+const gameOver=()=>(boardDone()&&S.round>=S.rounds)||S.teams.every(t=>t.out);
+function advanceTurn(){
+  const n=S.teams.length;
+  for(let k=1;k<=n;k++){ const i=(S.turn+k)%n; if(!S.teams[i].out){ S.turn=i; return true; } }
+  return false;
+}
+function nextTurn(){
+  if(S.phase!=="feedback") return;
+  S.cur=null;
+  if(gameOver()||!advanceTurn()) return endGame();
+  if(boardDone()){
+    S.round++; resetBoard();
+    S.ans=S.turn; S.phase="board"; sfx.fanfare(); addLog("Round "+S.round+" started");
+    renderAll(); broadcast();
+    return toast("ROUND "+S.round+"! NEW QUESTIONS. "+S.teams[S.turn].name+" STARTS");
+  }
+  S.ans=S.turn; S.phase="board"; sfx.select(); renderAll(); broadcast();
+}
+function onTimeOut(i){
+  const t=S.teams[i]; t.out=true; sfx.timeup();
+  if(S.phase==="question"&&i===S.ans) doAnswer(i,-1,true);
+  else {
+    toast(t.name+" RAN OUT OF TIME!"); addLog(t.name+" ran out of time and is out");
+    if(gameOver()||!advanceTurn()) endGame(); else { S.ans=S.turn; renderAll(); broadcast(); }
+  }
+}
+function skipTurn(){
+  if(S.phase!=="board") return;
+  const from=S.teams[S.turn].name;
+  if(advanceTurn()){ S.ans=S.turn; addLog("Teacher skipped "+from+"'s turn"); sfx.select(); renderAll(); broadcast(); }
+}
+function endGame(){
+  S.phase="end"; S.paused=false; $("pauseModal").hidden=true;
+  Audio8.stopMusic(); sfx.fanfare();
+  const r=rankOf(S.teams), tie=r.length>1&&r[1].t.score===r[0].t.score;
+  $("winTitle").textContent=tie?"IT'S A DRAW!":r[0].t.name+" WINS!";
+  $("winSub").textContent=tie?"JOINT CHAMPIONS OF THE TRANSPORT SYSTEM":"TOP OF THE TRANSPORT SYSTEM";
+  $("final").innerHTML=r.map(x=>{const p=playersOf(x.t);return '<li style="--tc:'+x.t.color+'"><span class="pos">'+x.pos+'</span><span class="nm">'+esc(x.t.name)+'<small>'+esc((p?p+" · ":"")+x.t.right+" correct · "+x.t.steals+" stolen")+'</small></span><span class="pts">'+x.t.score+'</span></li>'}).join("");
+  drawTrophy(); show("screen-end"); broadcast();
+  addLog("Game over");
+}
+$("againBtn").addEventListener("click",()=>{
+  S.clients.forEach(c=>send(c.conn,{t:"kicked",msg:"The teacher started a new game. Join again with the new code."}));
+  setTimeout(()=>{ try{S.peer&&S.peer.destroy()}catch(e){} S.peer=null; },300);
+  S.phase="setup"; show("screen-setup");
+});
+
+/* ---------- broadcast state to student devices ---------- */
+function snapshot(){
+  const c=S.cur;
+  return {t:"state",phase:S.phase,mode:S.mode,paused:S.paused,round:S.round,rounds:S.rounds,turn:S.turn,ans:S.ans,used:S.used,
+    stealLeft:Math.ceil(S.stealLeft),
+    teams:S.teams.map((t,i)=>({name:t.name,players:t.players,color:t.color,score:t.score,time:Math.ceil(t.time),out:t.out,right:t.right,steals:t.steals,slots:membersOf(i).length})),
+    board:S.board.map(b=>({s:b.s,label:b.label,color:b.color})),
+    cur:c?{idx:c.idx,ti:c.ti,li:c.li,value:c.value,q:c.q.q,opts:c.opts,wrong:c.wrong,stealing:c.stealing,tried:c.tried,eligible:S.phase==="steal"?eligibleStealers():[],
+      timedOut:!!c.timedOut,reveal:c.reveal,ans:c.reveal?c.ans:null,e:c.reveal?c.q.e:null,winner:c.winner}:null};
+}
+function broadcast(){
+  if(!isDevices()) return;
+  const snap=snapshot();
+  S.clients.forEach(c=>{ if(c.conn&&c.conn.open) send(c.conn,Object.assign({},snap,{you:c.team})); });
+}
+
+/* ---------- teacher rendering ---------- */
 function buildScoreboard(){
   const sb=$("scoreboard"); sb.innerHTML="";
   S.teams.forEach((t,i)=>{
     const el=document.createElement("div"); el.className="team"; el.id="tm"+i; el.style.setProperty("--tc",t.color);
     el.innerHTML='<div class="name"></div><div class="players"></div><div class="row"><span class="score"></span><span class="clock"></span></div><div class="flag"></div>';
     el.querySelector(".name").textContent=t.name;
-    el.querySelector(".players").textContent=playersOf(t)||" ";
     sb.appendChild(el);
   });
 }
-
-const activeTeam=()=>S.phase==="board"?S.turn:S.ans;
-
 function renderHUD(){
   const act=activeTeam(), live=S.phase==="board"||S.phase==="question";
   S.teams.forEach((t,i)=>{
     const el=$("tm"+i); if(!el) return;
+    el.querySelector(".players").textContent=playersOf(t)||" ";
     el.querySelector(".score").textContent=t.score;
     el.querySelector(".clock").textContent=fmt(t.time);
     el.classList.toggle("active",live&&i===act&&!t.out);
@@ -543,195 +975,321 @@ function renderHUD(){
     el.classList.toggle("out",t.out);
     let flag="";
     if(t.out) flag="OUT OF TIME";
-    else if(live&&i===act) flag=S.phase==="board"?"▶ YOUR TURN":(S.cur&&S.cur.stealing?"▶ STEALING":"▶ ANSWERING");
+    else if(live&&i===act) flag=S.phase==="board"?"▶ PICKING":(S.cur&&S.cur.stealing?"▶ STEALING":"▶ ANSWERING");
     el.querySelector(".flag").textContent=flag;
   });
   const cur=S.teams[S.turn];
-  $("turnline").textContent=S.phase==="board"&&cur?"ROUND "+S.round+"/"+S.rounds+" · "+cur.name+": PICK A TOPIC AND POINTS":"";
-  if(S.cur&&S.phase!=="board"){
+  $("turnline").textContent=S.phase==="board"&&cur?"ROUND "+S.round+"/"+S.rounds+" · "+cur.name+": PICK A TOPIC AND POINTS"+(isDevices()?" ON YOUR DEVICE":""):"";
+  if(S.cur){
     const t=S.teams[S.ans], q=$("qclock");
     q.textContent="TIME "+fmt(t.time);
     q.classList.toggle("low",t.time<=10&&S.phase==="question");
   }
+  if(S.phase==="steal"&&isDevices()) $("stealInfo").textContent="Teams can tap STEAL on their device. First tap wins the chance. "+Math.ceil(S.stealLeft)+"s left.";
 }
-
-function setQTeam(){
-  const t=S.teams[S.ans], p=playersOf(t);
-  $("qteam").textContent=(S.cur.stealing?"STEAL: ":"")+t.name+(p?" ("+p+")":"");
+function renderBoard(){
+  const b=$("board");
+  b.innerHTML=boardHTML(S.board,!isDevices());
+}
+$("board").addEventListener("click",e=>{
+  const b=e.target.closest(".cell"); if(!b||b.disabled||isDevices()) return;
+  doPick(S.turn,+b.dataset.idx);
+});
+let builtFor=null, stealBuiltFor="";
+function renderStage(){
+  const inQ=S.cur&&(S.phase==="question"||S.phase==="steal"||S.phase==="feedback");
+  $("board").hidden=!!inQ; $("qpanel").hidden=!inQ;
+  if(!inQ){ builtFor=null; return; }
+  const c=S.cur, t=S.teams[S.ans], p=playersOf(t);
+  if(builtFor!==c){
+    builtFor=c;
+    $("qcat").textContent=TOPICS[c.ti].name; $("qval").textContent=c.value+" PTS";
+    $("qtext").textContent=c.q.q;
+    const box=$("opts"); box.innerHTML="";
+    c.opts.forEach((txt,i)=>{
+      const b=document.createElement("button"); b.type="button"; b.className="opt";
+      b.innerHTML='<span class="k">'+"ABCD"[i]+'</span><span></span>'; b.lastChild.textContent=txt;
+      b.addEventListener("click",()=>{ if(!isDevices()) doAnswer(S.ans,i); });
+      box.appendChild(b);
+    });
+  }
+  $("qteam").textContent=(c.stealing?"STEAL: ":"")+t.name+(p?" ("+p+")":"");
   $("qteam").style.color=t.color;
-}
-
-function openQ(ti,li,btn){
-  if(S.phase!=="board"||S.paused) return;
-  // each slot has 2 questions: round 1 uses one, round 2 uses the other
-  const raw=TOPICS[ti].levels[li][S.qorder[ti][li][S.round-1]];
-  const order=shuffle([0,1,2,3]);
-  S.ans=S.turn;
-  S.cur={ti,li,btn,q:raw,opts:order.map(i=>raw.a[i]),ans:order.indexOf(0),value:VALUES[li],tried:new Set([S.turn]),wrong:new Set(),stealing:false};
-  S.phase="question"; Audio8.setThinking(true); sfx.select();
-  $("qcat").textContent=TOPICS[ti].name; $("qval").textContent=VALUES[li]+" PTS";
-  setQTeam();
-  $("qtext").textContent=raw.q;
-  const box=$("opts"); box.innerHTML="";
-  S.cur.opts.forEach((txt,i)=>{
-    const b=document.createElement("button"); b.type="button"; b.className="opt";
-    b.innerHTML='<span class="k">'+(i+1)+'</span><span></span>'; b.lastChild.textContent=txt;
-    b.addEventListener("click",()=>answer(i)); box.appendChild(b);
+  [...$("opts").children].forEach((b,k)=>{
+    b.classList.toggle("wrong",c.wrong.includes(k));
+    b.classList.toggle("right",c.reveal&&k===c.ans);
+    b.disabled=c.wrong.includes(k)||S.phase!=="question";
   });
-  $("feedback").hidden=true; $("steal").hidden=true;
-  $("qmodal").hidden=false; renderHUD();
-  box.firstChild.focus();
-}
-
-function answer(i,timedOut){
-  if(S.phase!=="question") return;
-  const c=S.cur, t=S.teams[S.ans];
-  if(i>=0&&c.wrong.has(i)) return;
-  if(i===c.ans){
-    t.score+=c.value; t.right++; if(c.stealing) t.steals++;
-    sfx.correct(); return finish(S.ans);
+  // steal panel
+  const st=$("steal"); st.hidden=S.phase!=="steal";
+  if(S.phase==="steal"){
+    const key=c.idx+"|"+c.tried.join(",");
+    $("stealTitle").textContent=(c.timedOut?"TIME'S UP!":"WRONG!")+" STEAL CHANCE!";
+    if(stealBuiltFor!==key){
+      stealBuiltFor=key;
+      const box=$("stealbtns"); box.innerHTML="";
+      if(!isDevices()){
+        $("stealInfo").textContent="Which team wants to steal? Their own clock runs while they answer.";
+        eligibleStealers().forEach(i=>{
+          const b=document.createElement("button"); b.type="button"; b.textContent=S.teams[i].name;
+          b.style.setProperty("--tc",S.teams[i].color); b.addEventListener("click",()=>doBuzz(i)); box.appendChild(b);
+        });
+      }
+      const no=document.createElement("button"); no.type="button"; no.className="nosteal";
+      no.textContent=isDevices()?"CLOSE STEAL - SHOW ANSWER":"NO STEAL - SHOW ANSWER";
+      no.addEventListener("click",()=>{ if(S.phase==="steal") finish(null); });
+      box.appendChild(no);
+      if(!isDevices()) box.firstChild.focus();
+    }
+  } else stealBuiltFor="";
+  // feedback
+  const fb=$("feedback"); fb.hidden=S.phase!=="feedback";
+  if(S.phase==="feedback"){
+    const w=c.winner;
+    fb.className="feedback "+(w!=null?"good":"bad");
+    $("fbTitle").textContent=w!=null?(c.stealing?"STOLEN by "+S.teams[w].name+"! +":"CORRECT! +")+c.value:"NOBODY GOT IT";
+    $("fbText").textContent=(w!=null?"":"Answer: "+c.opts[c.ans]+". ")+c.q.e;
+    $("nextBtn").textContent=gameOver()?"SEE RESULTS ▶":(boardDone()?"START ROUND "+(S.round+1)+" ▶":"NEXT TURN ▶");
+    if(document.activeElement!==$("nextBtn")) $("nextBtn").focus();
   }
-  if(!timedOut) sfx.wrong();
-  if(i>=0){ c.wrong.add(i); const b=$("opts").children[i]; b.classList.add("wrong"); b.disabled=true; }
-  offerSteal(timedOut);
-}
-
-/* after a wrong answer, any team that has not tried yet (and still has time) can steal */
-function offerSteal(timedOut){
-  const c=S.cur;
-  const eligible=S.teams.map((t,i)=>i).filter(i=>!S.teams[i].out&&!c.tried.has(i));
-  if(!eligible.length||4-c.wrong.size<=1) return finish(null);
-  S.phase="steal"; Audio8.setThinking(false);
-  [...$("opts").children].forEach(b=>b.disabled=true);
-  $("stealTitle").textContent=(timedOut?"TIME'S UP!":"WRONG!")+" STEAL CHANCE!";
-  const box=$("stealbtns"); box.innerHTML="";
-  eligible.forEach(i=>{
-    const b=document.createElement("button"); b.type="button"; b.textContent=S.teams[i].name;
-    b.style.setProperty("--tc",S.teams[i].color);
-    b.addEventListener("click",()=>startSteal(i)); box.appendChild(b);
-  });
-  const no=document.createElement("button"); no.type="button"; no.className="nosteal"; no.textContent="NO STEAL - SHOW ANSWER";
-  no.addEventListener("click",()=>finish(null)); box.appendChild(no);
-  $("steal").hidden=false; renderHUD();
-  box.firstChild.focus();
-}
-
-function startSteal(j){
-  const c=S.cur; c.tried.add(j); c.stealing=true; S.ans=j;
-  S.phase="question"; Audio8.setThinking(true); sfx.select();
-  $("steal").hidden=true;
-  [...$("opts").children].forEach((b,k)=>b.disabled=c.wrong.has(k));
-  setQTeam(); renderHUD();
-  [...$("opts").children].find(b=>!b.disabled).focus();
-  last=performance.now();
-}
-
-function finish(winner){
-  const c=S.cur;
-  S.phase="feedback"; Audio8.setThinking(false);
-  $("steal").hidden=true;
-  [...$("opts").children].forEach((b,k)=>{b.disabled=true; if(k===c.ans)b.classList.add("right");});
-  c.btn.disabled=true;
-  if(winner!=null){
-    const t=S.teams[winner];
-    c.btn.textContent=t.name.slice(0,8)+" +"+c.value;
-    c.btn.classList.add("won"); c.btn.style.setProperty("--tc",t.color);
-  } else c.btn.textContent="MISSED";
-  S.used++;
-  const fb=$("feedback"); fb.hidden=false; fb.className="feedback "+(winner!=null?"good":"bad");
-  $("fbTitle").textContent=winner!=null
-    ?(c.stealing?"STOLEN by "+S.teams[winner].name+"! +":"CORRECT! +")+c.value
-    :"NOBODY GOT IT";
-  $("fbText").textContent=(winner!=null?"":"Answer: "+c.opts[c.ans]+". ")+c.q.e;
-  $("nextBtn").textContent=gameOver()?"SEE RESULTS ▶":(boardDone()?"START ROUND "+(S.round+1)+" ▶":"NEXT TURN ▶");
-  renderHUD(); $("nextBtn").focus();
-}
-
-const boardDone=()=>S.used>=25;
-const gameOver=()=>(boardDone()&&S.round>=S.rounds)||S.teams.every(t=>t.out);
-
-function advanceTurn(){
-  const n=S.teams.length;
-  for(let k=1;k<=n;k++){ const i=(S.turn+k)%n; if(!S.teams[i].out){ S.turn=i; return true; } }
-  return false;
-}
-
-function nextTurn(){
-  $("qmodal").hidden=true; S.cur=null;
-  if(gameOver()||!advanceTurn()) return endGame();
-  if(boardDone()){
-    S.round++; S.used=0; buildBoard();
-    S.ans=S.turn; S.phase="board"; sfx.fanfare(); renderHUD();
-    toast("ROUND "+S.round+"! NEW QUESTIONS. "+S.teams[S.turn].name+" STARTS");
-    return;
-  }
-  S.ans=S.turn; S.phase="board"; sfx.select(); renderHUD();
 }
 $("nextBtn").addEventListener("click",nextTurn);
 
-function onTimeOut(i){
-  const t=S.teams[i]; t.out=true; sfx.timeup();
-  if(S.phase==="question") answer(-1,true);
-  else {
-    toast(t.name+" RAN OUT OF TIME!");
-    if(gameOver()||!advanceTurn()) endGame(); else { S.ans=S.turn; renderHUD(); }
-  }
+function renderMonitor(){
+  if(!isDevices()||S.phase==="setup"||S.phase==="lobby") return;
+  $("mbody").innerHTML=S.teams.map((t,i)=>{
+    const mem=membersOf(i), on=mem.filter(c=>c.online).length;
+    const dev=S.mode==="team"?(on?'<span class="on">● ONLINE</span>':'<span class="off">○ OFFLINE</span>'):'<span class="'+(on===mem.length&&on?"on":"off")+'">● '+on+"/"+mem.length+"</span>";
+    return '<tr style="--tc:'+t.color+'"><td><span class="tn"><span class="sw"></span>'+esc(t.name)+'</span></td><td>'+dev+'</td><td>'+t.score+'</td><td>'+t.right+'</td><td>'+t.steals+'</td><td'+(t.time<=30?' class="off"':'')+'>'+(t.out?"OUT":fmt(t.time))+'</td><td>'+esc(t.last||"-")+'</td></tr>';
+  }).join("");
+  const show=$("peekChk").checked&&S.cur&&!S.cur.reveal;
+  $("peekAns").textContent=show?"ANSWER: "+"ABCD"[S.cur.ans]+" - "+S.cur.opts[S.cur.ans]:"";
 }
-
-function endGame(){
-  S.phase="end"; $("qmodal").hidden=true; $("pauseModal").hidden=true; S.paused=false;
-  Audio8.stopMusic(); sfx.fanfare();
-  const ranked=S.teams.slice().sort((a,b)=>b.score-a.score);
-  const top=ranked[0], tie=ranked.length>1&&ranked[1].score===top.score;
-  $("winTitle").textContent=tie?"IT'S A DRAW!":top.name+" WINS!";
-  $("winSub").textContent=tie?"JOINT CHAMPIONS OF THE TRANSPORT SYSTEM":"TOP OF THE TRANSPORT SYSTEM";
-  const list=$("final"); list.innerHTML="";
-  let pos=0;
-  ranked.forEach((t,k)=>{
-    if(k===0||t.score!==ranked[k-1].score) pos=k+1;
-    const li=document.createElement("li"); li.style.setProperty("--tc",t.color);
-    li.innerHTML='<span class="pos"></span><span class="nm"><span></span><small></small></span><span class="pts"></span>';
-    li.querySelector(".pos").textContent=pos;
-    li.querySelector(".nm span").textContent=t.name;
-    const p=playersOf(t);
-    li.querySelector(".nm small").textContent=(p?p+" · ":"")+t.right+" correct · "+t.steals+" stolen";
-    li.querySelector(".pts").textContent=t.score;
-    list.appendChild(li);
-  });
-  drawTrophy(); show("screen-end"); $("againBtn").focus();
-}
-$("againBtn").addEventListener("click",()=>{ S.phase="title"; show("screen-title"); $("startBtn").focus(); });
+function renderLog(){ $("log").innerHTML=S.log.map(l=>'<li><span class="tm">'+l.tm+'</span> '+esc(l.text)+'</li>').join(""); }
+$("peekChk").addEventListener("change",renderMonitor);
+function renderAll(){ renderHUD(); renderBoard(); renderStage(); renderMonitor(); }
 
 /* pause + toggles */
-function setPause(p){ if(S.phase==="title"||S.phase==="end") return; S.paused=p; $("pauseModal").hidden=!p; p?Audio8.stopMusic():Audio8.startMusic(); if(p)$("resumeBtn").focus(); last=performance.now(); }
+function setPause(p){
+  if(["setup","lobby","end"].includes(S.phase)) return;
+  S.paused=p; $("pauseModal").hidden=!p; p?Audio8.stopMusic():Audio8.startMusic();
+  if(p) $("resumeBtn").focus();
+  addLog(p?"Teacher paused the game":"Game resumed");
+  last=performance.now(); broadcast();
+}
 $("pauseBtn").addEventListener("click",()=>setPause(true));
 $("resumeBtn").addEventListener("click",()=>setPause(false));
 $("quitBtn").addEventListener("click",endGame);
+$("skipBtn").addEventListener("click",skipTurn);
 $("musicBtn").addEventListener("click",e=>{Audio8.init();const on=Audio8.toggleMusic();e.target.textContent="MUSIC "+(on?"ON":"OFF");e.target.setAttribute("aria-pressed",on)});
 $("sfxBtn").addEventListener("click",e=>{const on=Audio8.toggleSfx();e.target.textContent="SFX "+(on?"ON":"OFF");e.target.setAttribute("aria-pressed",on)});
-
-/* keyboard: 1-4 or A-D to answer, P to pause */
 document.addEventListener("keydown",e=>{
-  if(e.target.tagName==="INPUT") return;
+  if(e.target.tagName==="INPUT"||!$("screen-game").classList.contains("active")) return;
   const k=e.key.toLowerCase();
-  if(k==="p"&&S.phase!=="title"&&S.phase!=="end"){ setPause(!S.paused); return; }
-  if(S.phase==="question"&&!S.paused){
+  if(k==="p"){ setPause(!S.paused); return; }
+  if(!isDevices()&&S.phase==="question"&&!S.paused){
     let i="1234".indexOf(k); if(i<0) i="abcd".indexOf(k);
-    if(k&&i>-1){ e.preventDefault(); answer(i); }
+    if(k.length===1&&i>-1){ e.preventDefault(); doAnswer(S.ans,i); }
   }
 });
+window.addEventListener("beforeunload",e=>{ if(isDevices()&&!["setup","end"].includes(S.phase)&&S.peer){ e.preventDefault(); e.returnValue=""; } });
 
-/* each team's clock only runs while that team is picking or answering */
-let last=performance.now();
+/* clocks: a team's clock only runs while it is picking or answering; steal window counts down */
+let last=performance.now(), bcastAcc=0;
 setInterval(()=>{
   const now=performance.now(), dt=(now-last)/1000; last=now;
-  if(S.paused||(S.phase!=="board"&&S.phase!=="question")) return;
+  if(S.paused) return;
+  if(S.phase==="steal"&&isDevices()){
+    S.stealLeft=Math.max(0,S.stealLeft-dt); renderHUD();
+    bcastAcc+=dt; if(bcastAcc>=.5){bcastAcc=0;broadcast();}
+    if(S.stealLeft===0){ addLog("Nobody stole in time"); finish(null); }
+    return;
+  }
+  if(S.phase!=="board"&&S.phase!=="question") return;
   const i=activeTeam(), t=S.teams[i]; if(!t||t.out) return;
   const before=t.time; t.time=Math.max(0,before-dt);
   if(t.time<=10&&t.time>0&&Math.ceil(t.time)<Math.ceil(before)) sfx.tick();
   renderHUD();
+  bcastAcc+=dt; if(bcastAcc>=.5){ bcastAcc=0; broadcast(); if(isDevices()) renderMonitor(); }
   if(t.time===0) onTimeOut(i);
 },100);
+
+/* ================= STUDENT DEVICE (CLIENT) ================= */
+const C={peer:null,conn:null,code:"",mode:"",joined:false,state:null,you:-1,viewKey:"",retry:null,lastPhaseKey:""};
+C.cid=store.get("sq-cid")||(Math.random().toString(36).slice(2)+Date.now().toString(36));
+store.set("sq-cid",C.cid);
+
+function joinErr(msg){ $("joinErr").textContent=msg; $("joinBtn").disabled=false; }
+$("joinBack").addEventListener("click",()=>{ show("screen-home"); });
+$("codeIn").addEventListener("input",e=>{ e.target.value=e.target.value.replace(/\D/g,"").slice(0,6); });
+$("joinCodeForm").addEventListener("submit",e=>{
+  e.preventDefault(); Audio8.init(); Audio8.resume();
+  const code=$("codeIn").value.trim();
+  if(!/^\d{6}$/.test(code)) return joinErr("The code has 6 digits. Check the teacher's screen.");
+  $("joinErr").textContent="Connecting..."; $("joinBtn").disabled=true;
+  connectTo(code);
+});
+
+function connectTo(code){
+  C.code=code;
+  if(typeof Peer==="undefined") return joinErr("Could not load the connection library. Check your internet and reload.");
+  const go=()=>{
+    const conn=C.peer.connect(PEER_PREFIX+code,{reliable:true,serialization:"json"});
+    C.conn=conn;
+    const to=setTimeout(()=>{ if(!conn.open){ joinErr("Could not reach the game. Check the code, or ask your teacher if the game is still open."); try{conn.close()}catch(e){} } },10000);
+    conn.on("open",()=>{ clearTimeout(to); clearInterval(C.retry); C.retry=null; send(conn,{t:"hello",cid:C.cid}); });
+    conn.on("data",onHostMsg);
+    conn.on("close",()=>{ if(C.conn===conn) onHostLost(); });
+    conn.on("error",()=>{});
+  };
+  if(C.peer&&!C.peer.destroyed&&C.peer.open) return go();
+  if(C.peer){ try{C.peer.destroy()}catch(e){} }
+  C.peer=new Peer();
+  C.peer.on("open",go);
+  C.peer.on("disconnected",()=>{ try{C.peer.reconnect()}catch(e){} });
+  C.peer.on("error",err=>{
+    if(err.type==="peer-unavailable"){
+      if(C.joined) return; // reconnect loop handles it
+      joinErr("No game found with code "+code+". Check the code on the teacher's screen.");
+    } else if(!C.joined) joinErr("Connection problem ("+err.type+"). Check your internet and try again.");
+  });
+}
+
+function onHostLost(){
+  if(!C.joined||(C.state&&C.state.phase==="end")) return;
+  renderPlayMsg("LOST CONNECTION","Trying to reconnect to the teacher's game...",false);
+  if(!C.retry) C.retry=setInterval(()=>connectTo(C.code),4000);
+}
+
+function onHostMsg(m){
+  if(!m||typeof m!=="object") return;
+  if(m.t==="welcome"){
+    C.mode=m.mode;
+    if(m.joined){ C.joined=true; show("screen-play"); return; }
+    setupJoinForm();
+  } else if(m.t==="reject"){ joinErr(m.msg); }
+  else if(m.t==="joinerr"){ $("joinErr2").textContent=m.msg; $("joinTeamBtn").disabled=false; }
+  else if(m.t==="joined"){ C.joined=true; sfx.correct(); show("screen-play"); C.viewKey=""; }
+  else if(m.t==="kicked"){ C.joined=false; clearInterval(C.retry); C.retry=null; renderPlayMsg("GAME CLOSED",m.msg||"The teacher removed you from the game.",true); show("screen-play"); }
+  else if(m.t==="state"){ C.state=m; C.you=m.you; renderClient(); }
+}
+
+function setupJoinForm(){
+  $("joinCodeForm").hidden=true; $("joinTeamForm").hidden=false;
+  const team=C.mode==="team";
+  $("jfTeam").hidden=!team; $("jfP2").hidden=!team; $("jfPick").hidden=team;
+  $("jP1Label").textContent=team?"PLAYER 1":"YOUR NAME";
+  $("joinTeamBtn").hidden=!team; $("joinTeamBtn").disabled=false;
+  $("joinErr2").textContent="";
+  (team?$("jTeam"):$("jP1")).focus();
+  if(C.state) renderTeamPick();
+}
+function renderTeamPick(){
+  if(C.mode!=="student"||!C.state) return;
+  $("teamPick").innerHTML=C.state.teams.map((t,i)=>'<button type="button" data-ti="'+i+'" style="--tc:'+t.color+'"'+(t.slots>=2?" disabled":"")+'><span>'+esc(t.name)+'</span><span class="slots">'+t.slots+'/2</span></button>').join("");
+}
+$("teamPick").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  const name=clean($("jP1").value,12);
+  if(!name){ $("joinErr2").textContent="Type your name first."; $("jP1").focus(); return; }
+  $("joinErr2").textContent="Joining...";
+  send(C.conn,{t:"join",name,team:+b.dataset.ti});
+});
+$("joinTeamForm").addEventListener("submit",e=>{
+  e.preventDefault();
+  if(C.mode!=="team") return;
+  const team=clean($("jTeam").value,14);
+  if(!team){ $("joinErr2").textContent="Type a team name."; return; }
+  $("joinTeamBtn").disabled=true; $("joinErr2").textContent="Joining...";
+  send(C.conn,{t:"join",team,p1:$("jP1").value,p2:$("jP2").value});
+});
+
+let cSfxOn=true;
+$("cSfxBtn").addEventListener("click",e=>{cSfxOn=Audio8.toggleSfx();e.target.textContent="SFX "+(cSfxOn?"ON":"OFF");e.target.setAttribute("aria-pressed",cSfxOn)});
+
+function renderPlayMsg(title,text,back){
+  C.viewKey="msg";
+  $("pview").innerHTML='<div class="qbox px center"><h2 class="tag">'+esc(title)+'</h2><p>'+esc(text)+'</p>'+(back?'<button type="button" class="btn-go" id="backHome">BACK TO START</button>':'')+'</div>';
+  if(back) $("backHome").addEventListener("click",()=>location.href=location.pathname);
+}
+
+function renderClient(){
+  const s=C.state;
+  if(!C.joined){ if(s.phase==="lobby") renderTeamPick(); return; }
+  if(!$("screen-play").classList.contains("active")) show("screen-play");
+  const me=s.teams[C.you];
+  if(!me){ return renderPlayMsg("WAITING","Waiting for the teacher...",false); }
+  // header
+  $("meBar").style.setProperty("--tc",me.color);
+  $("meName").textContent=me.name; $("mePlayers").textContent=playersOf(me);
+  $("meScore").textContent=me.score+" PTS";
+  const myClockRuns=(s.phase==="board"&&s.turn===C.you)||(s.phase==="question"&&s.ans===C.you);
+  $("meClock").textContent=me.out?"OUT OF TIME":"TIME "+fmt(me.time);
+  $("meClock").classList.toggle("low",me.time<=30||me.out);
+  if(myClockRuns&&!s.paused&&me.time<=10&&me.time>0&&C.lastTick!==me.time){ C.lastTick=me.time; sfx.tick(); }
+
+  const c=s.cur;
+  const key=[s.phase,s.paused,s.turn,s.ans,s.round,s.used,c?c.idx:"",c?c.wrong.join(","):"",c?c.stealing:"",c?c.reveal:"",c?c.eligible.join(","):"",s.teams.length].join("|");
+  if(key===C.viewKey){ updateLive(s); return; }
+  const prev=C.viewKey; C.viewKey=key;
+  const v=$("pview");
+  const tname=i=>s.teams[i]?esc(s.teams[i].name):"";
+
+  if(s.paused){ v.innerHTML='<div class="status">PAUSED BY THE TEACHER</div>'; return; }
+  if(s.phase==="lobby"){
+    v.innerHTML='<div class="status go">YOU\'RE IN!</div><p class="center" style="text-align:center">Waiting for the teacher to start the game.</p><div class="lobbylist">'+
+      s.teams.filter(t=>C.mode==="team"||t.slots).map(t=>'<div class="lteam" style="--tc:'+t.color+'"><div class="nm">'+esc(t.name)+'</div><div class="who">'+esc(playersOf(t))+'</div></div>').join("")+'</div>';
+    return;
+  }
+  if(s.phase==="end"){
+    const r=rankOf(s.teams), mine=r.find(x=>x.i===C.you);
+    v.innerHTML='<div class="status go">GAME OVER · YOU PLACED #'+mine.pos+'</div><ol class="final">'+r.map(x=>'<li class="'+(x.i===C.you?"me":"")+'" style="--tc:'+x.t.color+'"><span class="pos">'+x.pos+'</span><span class="nm">'+esc(x.t.name)+'<small>'+x.t.right+' correct · '+x.t.steals+' stolen</small></span><span class="pts">'+x.t.score+'</span></li>').join("")+'</ol>';
+    if(!prev.startsWith("end")) sfx.fanfare();
+    return;
+  }
+  if(s.phase==="board"){
+    const mine=s.turn===C.you;
+    v.innerHTML='<div class="status'+(mine?" go":"")+'">'+(mine?"YOUR TURN! PICK A QUESTION":tname(s.turn)+" IS PICKING...")+'</div><p class="hint" style="text-align:center">ROUND '+s.round+'/'+s.rounds+'</p><div class="board mini'+(mine?"":" readonly")+'" id="cboard">'+boardHTML(s.board,"mini")+'</div>';
+    if(mine){
+      $("cboard").addEventListener("click",e=>{ const b=e.target.closest(".cell"); if(!b||b.disabled) return; sfx.select(); send(C.conn,{t:"pick",idx:+b.dataset.idx}); $("cboard").classList.add("readonly"); });
+      if(!prev.startsWith("board|false|"+s.turn)) sfx.select();
+    }
+    return;
+  }
+  // question / steal / feedback
+  const answering=s.phase==="question"&&s.ans===C.you;
+  const canSteal=s.phase==="steal"&&c.eligible.includes(C.you);
+  let status="";
+  if(s.phase==="question") status=answering?(c.stealing?"STEAL! YOUR TEAM IS ANSWERING":"YOUR TEAM IS ANSWERING"):tname(s.ans)+(c.stealing?" IS STEALING...":" IS ANSWERING...");
+  else if(s.phase==="steal") status=canSteal?"":"STEAL CHANCE FOR OTHER TEAMS...";
+  else if(s.phase==="feedback") status=c.winner===C.you?"YOUR TEAM WON +"+c.value+"!":(c.winner!=null?tname(c.winner)+(c.stealing?" STOLE IT!":" GOT IT!"):"NOBODY GOT IT");
+  let h='';
+  if(canSteal) h+='<button type="button" class="buzzer" id="buzz">STEAL! <span id="stealLeft">'+s.stealLeft+'</span></button>';
+  else h+='<div class="status'+((answering||(s.phase==="feedback"&&c.winner===C.you))?" go":"")+'">'+status+'</div>';
+  h+='<div class="qbox px"><div class="qhead"><span class="qcat">'+esc(TOPICS[c.ti].name)+'</span><span class="qval">'+c.value+' PTS</span></div>'+
+     '<p class="qtext">'+esc(c.q)+'</p><div class="opts'+(answering?"":" readonly")+'" id="copts">'+
+     c.opts.map((o,i)=>{const cls=(c.wrong.includes(i)?" wrong":"")+(c.reveal&&i===c.ans?" right":"");return '<button type="button" class="opt'+cls+'" data-i="'+i+'"'+((!answering||c.wrong.includes(i))?" disabled":"")+'><span class="k">'+"ABCD"[i]+'</span><span>'+esc(o)+'</span></button>'}).join("")+'</div>';
+  if(s.phase==="feedback") h+='<div class="feedback '+(c.winner!=null?"good":"bad")+'"><p>'+(c.winner!=null?"":"Answer: "+esc(c.opts[c.ans])+". ")+esc(c.e)+'</p><p class="hint">Waiting for the teacher to continue...</p></div>';
+  h+='</div>';
+  v.innerHTML=h;
+  if(answering){
+    $("copts").addEventListener("click",e=>{ const b=e.target.closest(".opt"); if(!b||b.disabled) return; send(C.conn,{t:"answer",i:+b.dataset.i}); [...$("copts").children].forEach(x=>x.disabled=true); });
+    sfx.select();
+  }
+  if(canSteal){ $("buzz").addEventListener("click",()=>{ send(C.conn,{t:"buzz"}); $("buzz").disabled=true; $("buzz").textContent="SENT..."; }); sfx.select(); }
+  if(s.phase==="feedback"&&!prev.startsWith("feedback")){
+    if(c.winner===C.you) sfx.correct(); else if(c.tried.includes(C.you)) sfx.wrong();
+  }
+}
+function updateLive(s){
+  const sl=$("stealLeft"); if(sl) sl.textContent=s.stealLeft;
+}
+
+/* auto-join from link: ?code=123456 */
+(function(){
+  const code=new URLSearchParams(location.search).get("code");
+  if(code&&/^\d{6}$/.test(code)){ show("screen-join"); $("codeIn").value=code; }
+})();
 </script>
 </body>
 </html>
