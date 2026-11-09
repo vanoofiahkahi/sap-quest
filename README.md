@@ -1,4 +1,6 @@
-# Sap Quest
+<p align="center"><img src="logo.svg" alt="TransQuest logo" width="420"></p>
+
+# TransQuest
 
 An 8-bit trivia game about plant transport (roots, xylem, phloem, transpiration) for lower secondary students.
 
