@@ -276,8 +276,8 @@ h2.logo span{color:var(--xylem)}
 
 /* home how-to list: coloured bullets */
 .how{list-style:none;padding:18px 20px;counter-reset:s}
-.how li{counter-increment:s;display:grid;grid-template-columns:36px 1fr;gap:10px;align-items:start}
-.how li::before{content:counter(s);font-family:var(--font-display);font-size:12px;color:var(--shadow);background:var(--leaf);text-align:center;padding:6px 0;box-shadow:var(--bevel)}
+.how li{counter-increment:s;position:relative;padding-left:48px;margin:10px 0;line-height:1.25}
+.how li::before{position:absolute;left:0;top:0;width:36px;content:counter(s);font-family:var(--font-display);font-size:12px;color:var(--shadow);background:var(--leaf);text-align:center;padding:6px 0;box-shadow:var(--bevel)}
 .how li:nth-child(2)::before{background:var(--xylem)} .how li:nth-child(3)::before{background:var(--phloem)}
 .how li:nth-child(4)::before{background:var(--pink)} .how li:nth-child(5)::before{background:var(--violet)}
 
@@ -347,6 +347,7 @@ h2.logo span{color:var(--xylem)}
       <button type="button" class="btn-go btn-big" id="goHost">&#9654; I'M THE TEACHER</button>
       <button type="button" class="btn-big" id="goJoin">&#9654; JOIN WITH A CODE</button>
     </div>
+    <button type="button" class="btn-small" id="homeMusicBtn" aria-pressed="true">&#9835; MUSIC ON</button>
     <ol class="how">
       <li>The <b>teacher</b> sets up the game and chooses a mode: one shared screen, a device per team, or a device per student.</li>
       <li>Students join with the <b>6-digit code</b> on the teacher's screen.</li>
@@ -659,6 +660,8 @@ const Audio8 = (()=>{
     init, sfx:S, startMusic, stopMusic,
     setThinking(v){ thinking=v; },
     toggleMusic(){ musicOn=!musicOn; musicOn?startMusic():stopMusic(); return musicOn; },
+    isMusicOn(){ return musicOn; },
+    isPlaying(){ return !!timer; },
     toggleSfx(){ sfxOn=!sfxOn; return sfxOn; },
     resume(){ if(ctx&&ctx.state==="suspended") ctx.resume().catch(()=>{}); }
   };
@@ -770,7 +773,7 @@ function boardHTML(board,clickable){
 
 /* home */
 $("goHost").addEventListener("click",()=>{ Audio8.init(); sfx.select(); show("screen-setup"); });
-$("goJoin").addEventListener("click",()=>{ Audio8.init(); sfx.select(); show("screen-join"); $("codeIn").focus(); });
+$("goJoin").addEventListener("click",()=>{ Audio8.init(); Audio8.stopMusic(); sfx.select(); show("screen-join"); $("codeIn").focus(); });
 
 /* ================= TEACHER (HOST) ================= */
 const S={mode:"team",phase:"setup",teams:[],turn:0,ans:0,used:0,round:1,rounds:2,secs:300,qorder:[],board:[],cur:null,paused:false,stealLeft:0,log:[],code:"",peer:null,clients:new Map()};
@@ -1234,7 +1237,18 @@ $("pauseBtn").addEventListener("click",()=>setPause(true));
 $("resumeBtn").addEventListener("click",()=>setPause(false));
 $("quitBtn").addEventListener("click",endGame);
 $("skipBtn").addEventListener("click",skipTurn);
-$("musicBtn").addEventListener("click",e=>{Audio8.init();const on=Audio8.toggleMusic();e.target.textContent="MUSIC "+(on?"ON":"OFF");e.target.setAttribute("aria-pressed",on)});
+function syncMusicBtns(){ const on=Audio8.isMusicOn();
+  $("musicBtn").textContent="MUSIC "+(on?"ON":"OFF"); $("musicBtn").setAttribute("aria-pressed",on);
+  $("homeMusicBtn").innerHTML="&#9835; MUSIC "+(on?"ON":"OFF"); $("homeMusicBtn").setAttribute("aria-pressed",on); }
+$("musicBtn").addEventListener("click",()=>{Audio8.init();Audio8.resume();Audio8.toggleMusic();syncMusicBtns()});
+$("homeMusicBtn").addEventListener("click",()=>{ Audio8.init(); Audio8.resume();
+  if(Audio8.isMusicOn() && !Audio8.isPlaying()) Audio8.startMusic(); else Audio8.toggleMusic();
+  syncMusicBtns(); });
+/* home-screen music: browsers block autoplay, so start on the first tap/key while on the home screen */
+function homeMusicKick(e){ if(!$("screen-home").classList.contains("active") || e.target.closest("#homeMusicBtn")) return;
+  Audio8.init(); Audio8.resume(); Audio8.setThinking(false); Audio8.startMusic(); }
+document.addEventListener("pointerdown",homeMusicKick);
+document.addEventListener("keydown",homeMusicKick);
 $("sfxBtn").addEventListener("click",e=>{const on=Audio8.toggleSfx();e.target.textContent="SFX "+(on?"ON":"OFF");e.target.setAttribute("aria-pressed",on)});
 document.addEventListener("keydown",e=>{
   if(e.target.tagName==="INPUT"||!$("screen-game").classList.contains("active")) return;
