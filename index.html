@@ -901,6 +901,7 @@ function onClientMsg(conn,m){
     const cid=String(m.cid||"").slice(0,40); if(!cid) return;
     conn.cid=cid;
     const c=S.clients.get(cid);
+    if(c&&c.team<0&&S.phase!=="lobby"){ c.conn=conn; return send(conn,{t:"reject",msg:"This game has already started. Ask your teacher to start a new one."}); }
     if(c){ c.conn=conn; c.online=true; send(conn,{t:"welcome",mode:S.mode,size:S.size,joined:c.team>=0}); if(c.team>=0&&S.phase!=="lobby") addLog((c.name||S.teams[c.team].name)+" reconnected"); }
     else{
       if(S.phase!=="lobby") return send(conn,{t:"reject",msg:"This game has already started. Ask your teacher to start a new one."});
@@ -911,7 +912,8 @@ function onClientMsg(conn,m){
   }
   const c=S.clients.get(conn.cid); if(!c) return;
   if(m.t==="join"){
-    if(S.phase!=="lobby"||c.team>=0) return;
+    if(c.team>=0) return;
+    if(S.phase!=="lobby") return send(conn,{t:"reject",msg:"This game has already started. Ask your teacher to start a new one."});
     if(S.mode==="team"){
       if(S.teams.length>=15) return send(conn,{t:"joinerr",msg:"This game is full (15 teams)."});
       let base=clean(m.team,14)||("TEAM "+(S.teams.length+1)), name=base, n=2;
@@ -981,7 +983,8 @@ function renderLobby(){
 $("lobbyList").addEventListener("click",e=>{ const b=e.target.closest(".kick"); if(b) kick(b.dataset.cid); });
 $("lobbyCancel").addEventListener("click",()=>{
   S.clients.forEach(c=>send(c.conn,{t:"kicked",msg:"The teacher closed the game."}));
-  setTimeout(()=>{ try{S.peer&&S.peer.destroy()}catch(e){} S.peer=null; },300);
+  const oldPeer=S.peer; S.peer=null;
+  setTimeout(()=>{ try{oldPeer&&oldPeer.destroy()}catch(e){} },300);
   S.phase="setup"; show("screen-setup");
 });
 $("lobbyStart").addEventListener("click",()=>{
@@ -1110,7 +1113,8 @@ function endGame(){
 }
 $("againBtn").addEventListener("click",()=>{
   S.clients.forEach(c=>send(c.conn,{t:"kicked",msg:"The teacher started a new game. Join again with the new code."}));
-  setTimeout(()=>{ try{S.peer&&S.peer.destroy()}catch(e){} S.peer=null; },300);
+  const oldPeer=S.peer; S.peer=null;
+  setTimeout(()=>{ try{oldPeer&&oldPeer.destroy()}catch(e){} },300);
   S.phase="setup"; show("screen-setup");
 });
 
@@ -1361,7 +1365,7 @@ function onHostMsg(m){
     C.mode=m.mode; C.size=m.size||2;
     if(m.joined){ C.joined=true; show("screen-play"); return; }
     setupJoinForm();
-  } else if(m.t==="reject"){ joinErr(m.msg); }
+  } else if(m.t==="reject"){ joinErr(m.msg); $("joinErr2").textContent=m.msg; $("joinTeamBtn").disabled=true; $("teamPick").querySelectorAll("button").forEach(b=>b.disabled=true); }
   else if(m.t==="joinerr"){ $("joinErr2").textContent=m.msg; $("joinTeamBtn").disabled=false; }
   else if(m.t==="joined"){ C.joined=true; sfx.correct(); show("screen-play"); C.viewKey=""; }
   else if(m.t==="kicked"){ C.joined=false; clearInterval(C.retry); C.retry=null; renderPlayMsg("GAME CLOSED",m.msg||"The teacher removed you from the game.",true); show("screen-play"); }
@@ -1411,7 +1415,11 @@ function renderPlayMsg(title,text,back){
 
 function renderClient(){
   const s=C.state;
-  if(!C.joined){ if(s.phase==="lobby") renderTeamPick(); return; }
+  if(!C.joined){
+    if(s.phase==="lobby") renderTeamPick();
+    else if(!$("joinTeamForm").hidden){ $("joinErr2").textContent="This game has already started. Ask your teacher to start a new one."; $("joinTeamBtn").disabled=true; $("teamPick").querySelectorAll("button").forEach(b=>b.disabled=true); }
+    return;
+  }
   if(!$("screen-play").classList.contains("active")) show("screen-play");
   const me=s.teams[C.you];
   if(!me){ return renderPlayMsg("WAITING","Waiting for the teacher...",false); }
