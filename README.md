@@ -14,6 +14,7 @@ An 8-bit trivia game about plant transport (roots, xylem, phloem, transpiration)
 ## Features
 - 2-15 teams of 1-6 players (teacher's choice), each team with its own clock
 - Pick a topic and points: higher points mean harder questions
+- Some 300, 400 and 500 point questions are short type-in answers; capital letters do not matter
 - Wrong answers can be stolen by other teams (first to tap STEAL)
 - 2 rounds, 50 questions, chiptune music and sound effects
 - Teacher monitor: who is online, scores, answers and a live activity log

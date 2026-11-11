@@ -139,6 +139,15 @@ input.code{font-family:var(--font-display);font-size:28px;letter-spacing:8px;tex
 .opt .k{font-family:var(--font-display);font-size:12px;color:var(--phloem);padding-top:4px;flex:none}
 .opt.right{background:var(--leaf);color:var(--bg);opacity:1} .opt.right .k{color:var(--bg)}
 .opt.wrong{background:var(--bad);color:var(--bg);opacity:1} .opt.wrong .k{color:var(--bg)}
+.opts.fill{grid-template-columns:1fr}
+.fillform{display:flex;gap:12px;flex-wrap:wrap;align-items:stretch}
+.fillform[hidden]{display:none}
+.fillform input{flex:1 1 12ch;font-size:clamp(26px,3.4vw,34px);padding:8px 12px}
+.fillform input:disabled{opacity:.45}
+.guesses{display:flex;flex-wrap:wrap;gap:8px}
+.guesses:empty{display:none}
+.guess{font-size:clamp(22px,2.6vw,28px);line-height:1.1;padding:4px 10px;border:4px solid var(--shadow);background:var(--bad);color:var(--bg);overflow-wrap:anywhere}
+.guess.right{background:var(--leaf);animation:pop .4s steps(4)}
 .opts.readonly .opt{cursor:default}
 .opts.readonly .opt:active{transform:none;box-shadow:4px 4px 0 var(--shadow)}
 .opt:disabled:not(.right):not(.wrong){opacity:.45}
@@ -353,7 +362,7 @@ h2.logo span{color:var(--xylem)}
     <ol class="how">
       <li>The <b>teacher</b> sets up the game and chooses a mode: one shared screen, a device per team, or a device per student.</li>
       <li>Students join with the <b>6-digit code</b> on the teacher's screen.</li>
-      <li>Teams take turns picking a <b>topic</b> and <b>points</b>. Bigger points = harder questions.</li>
+      <li>Teams take turns picking a <b>topic</b> and <b>points</b>. Bigger points = harder questions, and some of them need a <b>typed answer</b>.</li>
       <li>Wrong answer? Other teams can <b>STEAL</b> it.</li>
       <li>Each team has its <b>own clock</b>. At 0:00 your team is out.</li>
     </ol>
@@ -549,7 +558,10 @@ h2.logo span{color:var(--xylem)}
 <script>
 /* ================= QUESTIONS =================
    5 topics x 5 levels, 2 questions per slot (one is picked at random each game).
-   a[0] is always the correct answer; options are shuffled at run time. */
+   a[0] is always the correct answer; options are shuffled at run time.
+   A question with f:[...] instead of a:[...] is a short fill-in: the team types the answer.
+   f[0] is shown as the answer and every entry in f is accepted. Typed answers are compared
+   without regard to capital letters, punctuation, extra spaces or a leading "a"/"the". */
 const TOPICS = [
  { name:"ROOTS & WATER UPTAKE", levels:[
   [ {q:"Which cells in the root are specially shaped to absorb water from the soil?", a:["Root hair cells","Guard cells","Palisade cells","Red blood cells"], e:"Root hair cells have long, thin extensions that reach between soil particles to absorb water."},
@@ -559,7 +571,7 @@ const TOPICS = [
   [ {q:"Root hair cells often take in minerals by active transport. What does active transport need?", a:["Energy from respiration","Sunlight","Carbon dioxide","Chlorophyll"], e:"Active transport moves minerals against a concentration gradient, so it needs energy released by respiration."},
     {q:"Why do root hair cells NOT have chloroplasts?", a:["They are underground, so there is no light for photosynthesis","They are dead cells","Chloroplasts would block the water","Roots are too cold for chloroplasts"], e:"No light reaches roots underground, so chloroplasts would be useless there."} ],
   [ {q:"Water moves INTO a root hair cell by osmosis. What must be true?", a:["The soil water is more dilute than the cell sap","The cell sap is more dilute than the soil water","Both have exactly the same concentration","The soil contains lots of sugar"], e:"Water moves by osmosis from a dilute solution (soil water) to a more concentrated one (cell sap)."},
-    {q:"Root hair cells contain many mitochondria. Why?", a:["To release energy for active transport of minerals","To make glucose","To store water","To absorb light"], e:"Mitochondria carry out respiration, which releases the energy needed for active transport."} ],
+    {q:"Root hair cells need lots of energy for active transport. Which cell structures, found in large numbers in these cells, release that energy?", f:["Mitochondria","Mitochondrion"], e:"Mitochondria carry out respiration, which releases the energy needed for active transport."} ],
   [ {q:"A farmer adds far too much fertiliser, so the soil water becomes very concentrated. What happens to the plants?", a:["Water leaves the root cells by osmosis and the plants wilt","The plants absorb water faster than before","Nothing happens to the plants","Minerals enter the roots by osmosis"], e:"If the soil water is more concentrated than the cell sap, water moves OUT of the roots by osmosis, so the plant wilts."},
     {q:"Which is the correct path that water takes through a plant?", a:["Soil, root hair cell, root cortex, xylem, leaf","Soil, xylem, root hair cell, phloem, leaf","Soil, phloem, root cortex, stomata, leaf","Soil, stomata, xylem, root hair cell, leaf"], e:"Water enters root hair cells, crosses the cortex cells, enters the xylem and travels up to the leaves."} ] ]},
 
@@ -570,10 +582,10 @@ const TOPICS = [
     {q:"Which substance makes xylem walls strong and waterproof?", a:["Lignin","Starch","Chlorophyll","Glucose"], e:"Lignin thickens and strengthens xylem walls so they do not collapse."} ],
   [ {q:"Why do xylem vessels have no end walls between their cells?", a:["To make a continuous hollow tube so water flows easily","To let sugar in","To trap air bubbles","To make the stem bendy"], e:"With no end walls, the cells join into one long open pipe."},
     {q:"Apart from transport, what other job does xylem do?", a:["It helps support the plant and hold it upright","It makes food","It produces seeds","It absorbs sunlight"], e:"The tough lignified walls of xylem help support stems, like a skeleton."} ],
-  [ {q:"A celery stick stands in red dye for a day. The cut stem shows red dots. Which tissue are the dots?", a:["Xylem","Phloem","Epidermis","Stomata"], e:"The dye travels up with the water, and water travels in the xylem."},
+  [ {q:"A celery stick stands in red dye for a day. The cut stem shows red dots. Which tissue are the dots?", f:["Xylem","Xylem vessels","Xylem vessel","Xylem tissue"], e:"The dye travels up with the water, and water travels in the xylem."},
     {q:"In the stem of a typical flowering plant, where is the xylem found in each vascular bundle?", a:["On the inside, with phloem on the outside","On the outside, with phloem on the inside","Only in the leaves","Mixed into the epidermis"], e:"In a stem's vascular bundles, xylem is towards the centre and phloem is towards the outside."} ],
   [ {q:"What mainly pulls water up the xylem of a very tall tree?", a:["Transpiration pull, as water evaporates from the leaves","Gravity","A pump in the roots like a heart","The phloem pushing it"], e:"As water evaporates from leaves, it pulls the whole column of water up the xylem."},
-    {q:"Water molecules stick to each other, making an unbroken column in the xylem. What is this called?", a:["Cohesion","Osmosis","Diffusion","Translocation"], e:"Cohesion means water molecules are attracted to each other, so the column can be pulled up without breaking."} ] ]},
+    {q:"Water molecules stick to each other, making an unbroken column in the xylem. What is this called?", f:["Cohesion"], e:"Cohesion means water molecules are attracted to each other, so the column can be pulled up without breaking."} ] ]},
 
  { name:"PHLOEM", levels:[
   [ {q:"What does phloem transport?", a:["Sugars (food) made in the leaves","Only water","Minerals from the soil","Carbon dioxide"], e:"Phloem carries dissolved sugars made by photosynthesis to other parts of the plant."},
@@ -581,9 +593,9 @@ const TOPICS = [
   [ {q:"What is the name for the movement of sugars through the phloem?", a:["Translocation","Transpiration","Osmosis","Evaporation"], e:"Translocation is the transport of dissolved sugars (and amino acids) in the phloem."},
     {q:"In which form is sugar mainly carried in the phloem?", a:["Sucrose","Starch","Protein","Fat"], e:"Glucose is turned into sucrose, which dissolves well and is carried in the phloem sap."} ],
   [ {q:"How is phloem transport different from xylem transport?", a:["Phloem can carry substances both up and down","Phloem only carries things upwards","Phloem only works at night","Phloem is only found in roots"], e:"Phloem moves sugars wherever they are needed, so it can go both up and down the plant."},
-    {q:"Phloem tubes are made of living cells called...", a:["Sieve tubes","Guard cells","Root hair cells","Xylem vessels"], e:"Sieve tubes are living cells joined end to end, helped by companion cells."} ],
-  [ {q:"The end walls of phloem cells have small holes in them. What are these called?", a:["Sieve plates","Stomata","Lenticels","Root hairs"], e:"Sieve plates have pores that let the sugary sap flow from one sieve tube cell to the next."},
-    {q:"Aphids are insects that drink sugary sap. Which tissue do they push their mouthparts into?", a:["Phloem","Xylem","Epidermis","Root hairs"], e:"Phloem sap is rich in sugar, so aphids tap straight into it."} ],
+    {q:"Phloem tubes are made of living cells called...", f:["Sieve tubes","Sieve tube","Sieve tube cells","Sieve tube cell","Sieve tube elements","Sieve tube element","Sieve cells","Sieve elements"], e:"Sieve tubes are living cells joined end to end, helped by companion cells."} ],
+  [ {q:"The end walls of phloem cells have small holes in them. What are these called?", f:["Sieve plates","Sieve plate"], e:"Sieve plates have pores that let the sugary sap flow from one sieve tube cell to the next."},
+    {q:"Aphids are insects that drink sugary sap. Which tissue do they push their mouthparts into?", f:["Phloem","Phloem tissue","Phloem tubes","Phloem tube","Phloem vessels"], e:"Phloem sap is rich in sugar, so aphids tap straight into it."} ],
   [ {q:"A ring of bark (including the phloem) is removed from a tree trunk. Weeks later the bark just ABOVE the ring swells. Why?", a:["Sugars moving down from the leaves build up above the cut","Water builds up because the xylem is blocked","Minerals from the roots collect there","The tree grows faster to repair the cut"], e:"Removing the phloem stops sugars travelling down, so they collect above the ring."},
     {q:"In spring, sugar from a potato's stored starch travels up to the new shoots. What does this show about phloem?", a:["It moves sugar from where it is stored to where it is needed","It always moves sugar from leaves to roots","It only carries water in spring","It only works in the dark"], e:"Phloem carries sugar from a source (here, the stored food) to a sink (the growing shoots)."} ] ]},
 
@@ -593,8 +605,8 @@ const TOPICS = [
   [ {q:"Which cells open and close the stomata?", a:["Guard cells","Root hair cells","Palisade cells","Sieve tubes"], e:"A pair of guard cells surrounds each stoma and changes shape to open or close it."},
     {q:"Where are most stomata found on a typical leaf?", a:["On the lower surface","On the upper surface","On the leaf stalk","On the roots"], e:"Most stomata are on the shaded lower surface of the leaf."} ],
   [ {q:"Why is it useful for most stomata to be on the LOWER surface of the leaf?", a:["It is cooler and shaded, so less water is lost","It gets more sunlight there","Insects can reach them more easily","It makes the leaf heavier"], e:"The underside is out of direct sun, so less water evaporates through the stomata."},
-    {q:"Inside the leaf, water evaporates from the surface of which cells?", a:["Spongy mesophyll cells","Root hair cells","Sieve tubes","Cells of the waxy cuticle"], e:"Water evaporates from the spongy mesophyll cells into the air spaces, then diffuses out of the stomata."} ],
-  [ {q:"What happens when a plant loses more water than it takes in?", a:["It wilts","It grows faster","It makes more flowers","It turns blue"], e:"Cells lose water and become soft (flaccid), so the plant droops or wilts."},
+    {q:"Inside the leaf, water evaporates from the surface of which cells?", f:["Spongy mesophyll cells","Spongy mesophyll cell","Spongy mesophyll","Spongy mesophyll layer","Mesophyll cells","Mesophyll cell","Mesophyll","Spongy cells","Spongy layer"], e:"Water evaporates from the spongy mesophyll cells into the air spaces, then diffuses out of the stomata."} ],
+  [ {q:"A plant loses more water than it takes in, so its cells go soft and it droops. What is this drooping called?", f:["Wilting","Wilt","Wilts","Wilted"], e:"Cells lose water and become soft (flaccid), so the plant droops or wilts."},
     {q:"Stomata usually close at night. How does this help the plant?", a:["It saves water, as no carbon dioxide is needed for photosynthesis in the dark","It lets the plant take in more light","It helps the plant absorb minerals","It makes the leaves grow bigger"], e:"No light means no photosynthesis, so closing the stomata saves water without losing anything."} ],
   [ {q:"Which is a useful effect of transpiration for the plant?", a:["It cools the leaves and pulls water and minerals up the stem","It makes glucose","It removes all oxygen from the leaf","It stops photosynthesis"], e:"Evaporation cools the leaf, and the transpiration stream brings water and minerals up from the roots."},
     {q:"Cacti have spines instead of broad, flat leaves. What is the main reason?", a:["A smaller surface area means less water is lost","Spines carry out more photosynthesis","Spines absorb water from the air","Spines make the cactus grow taller"], e:"Spines have a tiny surface area, which cuts down transpiration in hot, dry deserts."} ] ]},
@@ -604,12 +616,12 @@ const TOPICS = [
     {q:"In which weather will a plant lose water the fastest?", a:["Hot, dry and windy","Cold, damp and still","Dark and cold","Rainy and humid"], e:"Heat, dry air and wind all increase the rate of transpiration."} ],
   [ {q:"Why does wind increase transpiration?", a:["It blows away moist air near the leaf, so more water vapour can diffuse out","It pushes water into the leaves","It closes the stomata","It cools the roots"], e:"Wind removes the humid air around the leaf, keeping a steep concentration gradient for water vapour."},
     {q:"What does high humidity (damp air) do to transpiration?", a:["It slows it down","It speeds it up","It has no effect","It reverses it"], e:"Air already full of water vapour means less water vapour diffuses out of the leaf."} ],
-  [ {q:"Which piece of apparatus is used to measure how fast a leafy shoot takes up water?", a:["A potometer","A thermometer","A microscope","A barometer"], e:"A potometer tracks water uptake, often by timing how far an air bubble moves."},
+  [ {q:"Which piece of apparatus is used to measure how fast a leafy shoot takes up water?", f:["A potometer","Potometers"], e:"A potometer tracks water uptake, often by timing how far an air bubble moves."},
     {q:"Why does brighter light increase transpiration?", a:["Stomata open wider in the light","Light pushes water out of the leaf","Light makes the roots grow","Light closes the guard cells"], e:"Stomata open in light for photosynthesis, which also lets more water vapour escape."} ],
-  [ {q:"In a potometer, the air bubble moves 30 mm in 10 minutes. What is the rate of water uptake?", a:["3 mm per minute","300 mm per minute","0.3 mm per minute","40 mm per minute"], e:"Rate = distance / time = 30 mm / 10 min = 3 mm per minute."},
+  [ {q:"In a potometer, the air bubble moves 30 mm in 10 minutes. What is the rate of water uptake, in mm per minute?", f:["3 mm per minute","3","3.0","Three","3 mm","3mm","3mm per minute","3 mm per min","3mm per min","3 mm a minute","3mm a minute","3 mm/min","3mm/min","3 mm/minute","3mm/minute"], e:"Rate = distance / time = 30 mm / 10 min = 3 mm per minute."},
     {q:"A class tests whether a fan changes the rate of transpiration. To make it a fair test, what must stay the same?", a:["The type and size of plant, the temperature and the light","Whether the fan is on or off","Only the colour of the pot","Nothing needs to stay the same"], e:"Only the fan (the independent variable) should change. Everything else is a control variable."} ],
   [ {q:"A potometer measures water UPTAKE, not exactly transpiration. Why?", a:["Some water taken up is used by the plant, for example in photosynthesis","The potometer only measures sugar","Water never leaves the leaves","Air bubbles add extra water"], e:"A small amount of water is used or kept in cells, so uptake is slightly more than the water transpired."},
-    {q:"Leaf A has petroleum jelly on its LOWER surface, Leaf B on its UPPER surface, Leaf C has none. Which leaf loses the least mass after 2 days?", a:["Leaf A","Leaf B","Leaf C","All lose the same mass"], e:"Most stomata are on the lower surface. Sealing it blocks most water loss, so Leaf A loses the least."} ] ]}
+    {q:"Leaf A has petroleum jelly on its LOWER surface, Leaf B on its UPPER surface, Leaf C has none. Which leaf loses the least mass after 2 days?", f:["Leaf A","A"], e:"Most stomata are on the lower surface. Sealing it blocks most water loss, so Leaf A loses the least."} ] ]}
 ];
 const VALUES=[100,200,300,400,500];
 
@@ -867,6 +879,8 @@ function relayClient(code,onFail){
 const STEAL_WINDOW=10;
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const clean=(s,n)=>String(s==null?"":s).replace(/[\u0000-\u001f]/g,"").trim().toUpperCase().slice(0,n);
+/* fill-in answers: ignore capitals, punctuation, extra spaces and a leading "a", "an", "the" or "it" */
+const normAns=s=>String(s==null?"":s).toLowerCase().replace(/[^a-z0-9]+/g," ").trim().replace(/^(?:the|an|a|it) (?=.)/,"");
 const fmt=t=>{const s=Math.max(0,Math.ceil(t));return Math.floor(s/60)+":"+String(s%60).padStart(2,"0")};
 const playersOf=t=>{const p=t.players.filter(Boolean); return p.length>2?p.join(", "):p.join(" & ");};
 function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
@@ -1042,7 +1056,7 @@ function onClientMsg(conn,m){
   }
   if(c.team<0) return;
   if(m.t==="pick") doPick(c.team,+m.idx);
-  else if(m.t==="answer") doAnswer(c.team,+m.i);
+  else if(m.t==="answer") doAnswer(c.team,S.cur&&S.cur.fill?String(m.text==null?"":m.text):+m.i);
   else if(m.t==="buzz") doBuzz(c.team);
 }
 function onClientClose(conn){
@@ -1133,29 +1147,35 @@ function doPick(team,idx){
   if(!(idx>=0&&idx<25)||S.board[idx].s!=="open") return;
   const ti=idx%5, li=Math.floor(idx/5);
   const raw=TOPICS[ti].levels[li][S.qorder[ti][li][S.round-1]];
-  const order=shuffle([0,1,2,3]);
+  const fill=Array.isArray(raw.f), order=fill?[]:shuffle([0,1,2,3]);
   S.ans=S.turn;
-  S.cur={idx,ti,li,q:raw,opts:order.map(i=>raw.a[i]),ans:order.indexOf(0),value:VALUES[li],tried:[S.turn],wrong:[],stealing:false,winner:null,reveal:false,t0:performance.now()};
+  S.cur={idx,ti,li,q:raw,fill,opts:order.map(i=>raw.a[i]),ans:fill?-1:order.indexOf(0),answer:fill?raw.f[0]:raw.a[0],accept:fill?raw.f.map(normAns):null,value:VALUES[li],tried:[S.turn],wrong:[],stealing:false,winner:null,reveal:false,t0:performance.now()};
   S.phase="question"; Audio8.setThinking(true); sfx.select();
   addLog(S.teams[team].name+" picked "+TOPICS[ti].name+" "+VALUES[li]);
   renderAll(); broadcast();
 }
 function doAnswer(team,i,timedOut){
   if(S.phase!=="question"||team!==S.ans) return;
-  if(!timedOut&&(S.paused||!(i>=0&&i<4)||S.cur.wrong.includes(i))) return;
-  const c=S.cur, t=S.teams[team], secs=Math.round((performance.now()-c.t0)/1000);
-  if(!timedOut&&i===c.ans){
+  const c=S.cur;
+  let guess="";
+  if(!timedOut){
+    if(S.paused) return;
+    if(c.fill){ if(typeof i!=="string") return; guess=clean(i,40); if(!normAns(guess)) return; }
+    else if(typeof i!=="number"||!(i>=0&&i<4)||c.wrong.includes(i)) return;
+  }
+  const t=S.teams[team], secs=Math.round((performance.now()-c.t0)/1000);
+  if(!timedOut&&(c.fill?c.accept.includes(normAns(guess)):i===c.ans)){
     t.score+=c.value; t.right++; if(c.stealing) t.steals++; t.last="✓";
     sfx.correct(); World.confetti(); addLog(t.name+(c.stealing?" STOLE it":" answered correctly")+" (+"+c.value+", "+secs+"s)");
     return finish(team);
   }
   t.last=timedOut?"⏱":"✗";
-  if(timedOut) addLog(t.name+" ran out of time"); else { sfx.wrong(); World.shake($("qpanel")); c.wrong.push(i); addLog(t.name+" answered "+"ABCD"[i]+" - wrong ("+secs+"s)"); }
+  if(timedOut) addLog(t.name+" ran out of time"); else { sfx.wrong(); World.shake($("qpanel")); c.wrong.push(c.fill?guess:i); addLog(t.name+" answered "+(c.fill?'"'+guess+'"':"ABCD"[i])+" - wrong ("+secs+"s)"); }
   offerSteal(timedOut);
 }
 function offerSteal(timedOut){
   const c=S.cur, el=eligibleStealers();
-  if(!el.length||4-c.wrong.length<=1) return finish(null);
+  if(!el.length||(!c.fill&&4-c.wrong.length<=1)) return finish(null);
   S.phase="steal"; S.stealLeft=STEAL_WINDOW; c.timedOut=!!timedOut; Audio8.setThinking(false);
   renderAll(); broadcast();
 }
@@ -1171,7 +1191,7 @@ function finish(winner){
   S.phase="feedback"; c.winner=winner; c.reveal=true; Audio8.setThinking(false);
   const cell=S.board[c.idx];
   if(winner!=null){ const t=S.teams[winner]; Object.assign(cell,{s:"won",by:winner,label:t.name.slice(0,8)+" +"+c.value,color:t.color}); }
-  else { cell.s="missed"; addLog("Nobody got it. Answer: "+c.opts[c.ans]); }
+  else { cell.s="missed"; addLog("Nobody got it. Answer: "+c.answer); }
   S.used++;
   renderAll(); broadcast();
 }
@@ -1230,8 +1250,8 @@ function snapshot(){
     stealLeft:Math.ceil(S.stealLeft),
     teams:S.teams.map((t,i)=>({name:t.name,players:t.players,color:t.color,score:t.score,time:Math.ceil(t.time),out:t.out,right:t.right,steals:t.steals,slots:membersOf(i).length})),
     board:S.board.map(b=>({s:b.s,label:b.label,color:b.color})),
-    cur:c?{idx:c.idx,ti:c.ti,li:c.li,value:c.value,q:c.q.q,opts:c.opts,wrong:c.wrong,stealing:c.stealing,tried:c.tried,eligible:S.phase==="steal"?eligibleStealers():[],
-      timedOut:!!c.timedOut,reveal:c.reveal,ans:c.reveal?c.ans:null,e:c.reveal?c.q.e:null,winner:c.winner}:null};
+    cur:c?{idx:c.idx,ti:c.ti,li:c.li,value:c.value,q:c.q.q,fill:!!c.fill,opts:c.opts,wrong:c.wrong,stealing:c.stealing,tried:c.tried,eligible:S.phase==="steal"?eligibleStealers():[],
+      timedOut:!!c.timedOut,reveal:c.reveal,ans:c.reveal?c.ans:null,answer:c.reveal?c.answer:null,e:c.reveal?c.q.e:null,winner:c.winner}:null};
 }
 function broadcast(){
   if(!isDevices()) return;
@@ -1283,7 +1303,9 @@ $("board").addEventListener("click",e=>{
   const b=e.target.closest(".cell"); if(!b||b.disabled||isDevices()) return;
   doPick(S.turn,+b.dataset.idx);
 });
-let builtFor=null, stealBuiltFor="";
+let builtFor=null, stealBuiltFor="", fillKey="";
+/* wrong typed guesses, plus the right answer once it is revealed (teacher screen and student devices) */
+const guessChips=(wrong,answer)=>wrong.map(w=>'<span class="guess">&#10007; '+esc(w)+'</span>').join("")+(answer!=null?'<span class="guess right">&#10003; '+esc(answer)+'</span>':"");
 function renderStage(){
   const inQ=S.cur&&(S.phase==="question"||S.phase==="steal"||S.phase==="feedback");
   $("board").hidden=!!inQ; $("qpanel").hidden=!inQ;
@@ -1293,8 +1315,16 @@ function renderStage(){
     builtFor=c;
     $("qcat").textContent=TOPICS[c.ti].name; $("qval").textContent=c.value+" PTS";
     $("qtext").textContent=c.q.q;
-    const box=$("opts"); box.innerHTML="";
-    c.opts.forEach((txt,i)=>{
+    const box=$("opts"); box.innerHTML=""; box.classList.toggle("fill",c.fill); fillKey="";
+    if(c.fill){
+      box.innerHTML='<form class="fillform" id="fillForm"><input type="text" id="fillIn" maxlength="40" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Type the answer" placeholder="TYPE THE ANSWER"><button type="submit" class="btn-go" id="fillBtn">ANSWER</button></form><p class="hint" id="fillNote"></p><div class="guesses" id="fillWrong"></div>';
+      $("fillForm").addEventListener("submit",e=>{
+        e.preventDefault(); if(isDevices()) return;
+        const el=$("fillIn"); if(!normAns(el.value)){ el.focus(); return; }
+        doAnswer(S.ans,el.value);
+      });
+    }
+    else c.opts.forEach((txt,i)=>{
       const b=document.createElement("button"); b.type="button"; b.className="opt";
       b.innerHTML='<span class="k">'+"ABCD"[i]+'</span><span></span>'; b.lastChild.textContent=txt;
       b.addEventListener("click",()=>{ if(!isDevices()) doAnswer(S.ans,i); });
@@ -1303,7 +1333,16 @@ function renderStage(){
   }
   $("qteam").textContent=(c.stealing?"STEAL: ":"")+t.name+(p?" ("+p+")":"");
   $("qteam").style.color=t.color;
-  [...$("opts").children].forEach((b,k)=>{
+  if(c.fill){
+    const can=S.phase==="question"&&!isDevices(), el=$("fillIn");
+    $("fillForm").hidden=isDevices(); el.disabled=!can; $("fillBtn").disabled=!can;
+    $("fillNote").textContent=isDevices()?"Type-in question: the answering team types the answer on their device. Capital letters do not matter.":"Type the answer, then press ENTER. Capital letters do not matter.";
+    $("fillWrong").innerHTML=guessChips(c.wrong,c.reveal?c.answer:null);
+    const k=c.idx+"|"+S.ans+"|"+c.wrong.length+"|"+S.phase;
+    if(can&&k!==fillKey){ el.value=""; el.focus(); }
+    fillKey=k;
+  }
+  else [...$("opts").children].forEach((b,k)=>{
     b.classList.toggle("wrong",c.wrong.includes(k));
     b.classList.toggle("right",c.reveal&&k===c.ans);
     b.disabled=c.wrong.includes(k)||S.phase!=="question";
@@ -1336,7 +1375,7 @@ function renderStage(){
     const w=c.winner;
     fb.className="feedback "+(w!=null?"good":"bad");
     $("fbTitle").textContent=w!=null?(c.stealing?"STOLEN by "+S.teams[w].name+"! +":"CORRECT! +")+c.value:"NOBODY GOT IT";
-    $("fbText").textContent=(w!=null?"":"Answer: "+c.opts[c.ans]+". ")+c.q.e;
+    $("fbText").textContent=(w!=null?"":"Answer: "+c.answer+". ")+c.q.e;
     $("nextBtn").textContent=gameOver()?"SEE RESULTS ▶":(boardDone()?"START ROUND "+(S.round+1)+" ▶":"NEXT TURN ▶");
     if(document.activeElement!==$("nextBtn")) $("nextBtn").focus();
   }
@@ -1351,7 +1390,7 @@ function renderMonitor(){
     return '<tr style="--tc:'+t.color+'"><td><span class="tn"><span class="sw"></span>'+esc(t.name)+'</span></td><td>'+dev+'</td><td>'+t.score+'</td><td>'+t.right+'</td><td>'+t.steals+'</td><td'+(t.time<=30?' class="off"':'')+'>'+(t.out?"OUT":fmt(t.time))+'</td><td>'+esc(t.last||"-")+'</td></tr>';
   }).join("");
   const show=$("peekChk").checked&&S.cur&&!S.cur.reveal;
-  $("peekAns").textContent=show?"ANSWER: "+"ABCD"[S.cur.ans]+" - "+S.cur.opts[S.cur.ans]:"";
+  $("peekAns").textContent=show?"ANSWER: "+(S.cur.fill?"":"ABCD"[S.cur.ans]+" - ")+S.cur.answer:"";
 }
 function renderLog(){ $("log").innerHTML=S.log.map(l=>'<li><span class="tm">'+l.tm+'</span> '+esc(l.text)+'</li>').join(""); }
 $("peekChk").addEventListener("change",renderMonitor);
@@ -1652,13 +1691,28 @@ function renderClient(){
   if(canSteal) h+='<button type="button" class="buzzer" id="buzz">STEAL! <span id="stealLeft">'+s.stealLeft+'</span></button>';
   else h+='<div class="status'+((answering||(s.phase==="feedback"&&c.winner===C.you))?" go":"")+'">'+status+'</div>';
   h+='<div class="qbox px"><div class="qhead"><span class="qcat">'+esc(TOPICS[c.ti].name)+'</span><span class="qval">'+c.value+' PTS</span></div>'+
-     '<p class="qtext">'+esc(c.q)+'</p><div class="opts'+(answering?"":" readonly")+'" id="copts">'+
+     '<p class="qtext">'+esc(c.q)+'</p>';
+  if(c.fill) h+='<div class="opts fill" id="copts">'+
+     (answering?'<form class="fillform" id="cfill"><input type="text" id="cfillIn" maxlength="40" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Type your answer" placeholder="TYPE YOUR ANSWER"><button type="submit" class="btn-go">ANSWER</button></form><p class="hint">Capital letters do not matter.</p>'
+       :(s.phase==="question"?'<p class="hint">'+tname(s.ans)+' is typing an answer...</p>':''))+
+     '<div class="guesses">'+guessChips(c.wrong,c.reveal?c.answer:null)+'</div></div>';
+  else h+='<div class="opts'+(answering?"":" readonly")+'" id="copts">'+
      c.opts.map((o,i)=>{const cls=(c.wrong.includes(i)?" wrong":"")+(c.reveal&&i===c.ans?" right":"");return '<button type="button" class="opt'+cls+'" data-i="'+i+'"'+((!answering||c.wrong.includes(i))?" disabled":"")+'><span class="k">'+"ABCD"[i]+'</span><span>'+esc(o)+'</span></button>'}).join("")+'</div>';
-  if(s.phase==="feedback") h+='<div class="feedback '+(c.winner!=null?"good":"bad")+'"><p>'+(c.winner!=null?"":"Answer: "+esc(c.opts[c.ans])+". ")+esc(c.e)+'</p><p class="hint">Waiting for the teacher to continue...</p></div>';
+  if(s.phase==="feedback") h+='<div class="feedback '+(c.winner!=null?"good":"bad")+'"><p>'+(c.winner!=null?"":"Answer: "+esc(c.answer)+". ")+esc(c.e)+'</p><p class="hint">Waiting for the teacher to continue...</p></div>';
   h+='</div>';
   v.innerHTML=h;
   if(answering){
-    $("copts").addEventListener("click",e=>{ const b=e.target.closest(".opt"); if(!b||b.disabled) return; send(C.conn,{t:"answer",i:+b.dataset.i}); [...$("copts").children].forEach(x=>x.disabled=true); });
+    if(c.fill){
+      const f=$("cfill"), el=$("cfillIn"), btn=f.querySelector("button");
+      f.addEventListener("submit",e=>{
+        e.preventDefault(); if(el.disabled) return;
+        if(!normAns(el.value)){ el.focus(); return; }
+        send(C.conn,{t:"answer",text:el.value.slice(0,40)});
+        el.disabled=true; btn.disabled=true; btn.textContent="SENT...";
+      });
+      el.focus();
+    }
+    else $("copts").addEventListener("click",e=>{ const b=e.target.closest(".opt"); if(!b||b.disabled) return; send(C.conn,{t:"answer",i:+b.dataset.i}); [...$("copts").children].forEach(x=>x.disabled=true); });
     sfx.select();
   }
   if(canSteal){ $("buzz").addEventListener("click",()=>{ send(C.conn,{t:"buzz"}); $("buzz").disabled=true; $("buzz").textContent="SENT..."; }); sfx.select(); }
