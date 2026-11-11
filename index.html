@@ -1472,13 +1472,14 @@ setInterval(()=>{
 },100);
 
 /* ================= SERVER HOSTING =================
-   Opened with ?server in the address, the teacher's page creates the game on a database
+   By default the teacher's page creates device games on a database
    (supabase/setup.sql) instead of running it in this browser. The engine above is then not
    used for device games: the server keeps the board, clocks and answers, this screen shows
    what the server reports and sends the teacher's buttons to it, and student devices ask
-   the server about once a second. Without ?server, everything works as before. */
+   the server about once a second. If the server cannot be reached, the room is hosted in
+   this browser instead (as it always was); ?p2p in the address forces that. */
 const SRV={url:"https://bacszzkyyomjqsybvxho.supabase.co", key:"sb_publishable_Jkl6mf8QzjpsCJ2GYxifJA_fekNmG-j",
-  host:new URLSearchParams(location.search).has("server"), token:"", poll:null, busy:false, fails:0, look:{}, armed:""};
+  host:!new URLSearchParams(location.search).has("p2p"), token:"", poll:null, busy:false, fails:0, look:{}, armed:""};
 function rpc(fn,args){
   const h={apikey:SRV.key,"Content-Type":"application/json"};
   if(!/^sb_/.test(SRV.key)) h.Authorization="Bearer "+SRV.key;
@@ -1507,7 +1508,7 @@ function srvOpenRoom(){
   srvRoomUI(); renderLobby();
   rpc("tq_create",{p:{mode:S.mode,size:S.size,secs:S.secs,rounds:S.rounds,teams:S.teams.map(t=>t.name),topics:TOPICS.map(t=>t.name),bank:srvBank()}})
     .then(r=>{ if(!S.remote) return; S.code=r.code; SRV.token=r.token; store.set("tq-host",JSON.stringify(r)); srvRoomUI(); srvWatch(); })
-    .catch(()=>{ $("lobbyErr").textContent="Could not reach the game server. Check the internet connection, press CANCEL and try again."; });
+    .catch(()=>{ if(!S.remote) return; srvStop(); openRoom(); }); // server unreachable: host the room in this browser instead
 }
 function srvWatch(){ clearInterval(SRV.poll); SRV.fails=0; SRV.busy=false; SRV.sig=""; SRV.poll=setInterval(srvPoll,1000); srvPoll(); }
 function srvPoll(){

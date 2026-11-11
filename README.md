@@ -21,7 +21,7 @@ An 8-bit trivia game about plant transport (roots, xylem, phloem, transpiration)
 
 Devices connect peer-to-peer through PeerJS, with the teacher's browser acting as the game server. Keep the teacher's tab open during the game.
 
-## Server hosting (optional)
-Open the teacher page with `?server` at the end of the address and device games run on a database instead of in the teacher's browser. The game then keeps going if the teacher's device sleeps, reloads or drops off the network, and the teacher can pick it up again with RESUME GAME.
+## Server hosting
+Device games run on a database by default, so the game keeps going if the teacher's device sleeps, reloads or drops off the network, and the teacher can pick it up again with RESUME GAME. If the server cannot be reached, the room is hosted in the teacher's browser instead. Add `?p2p` to the address to always host in the browser.
 
-To set it up, paste `supabase/setup.sql` into the SQL Editor of the Supabase project named in `index.html` (search for `const SRV`) and press RUN. Without `?server`, or before the SQL is installed, everything works as described above.
+The server side is `supabase/setup.sql`, installed in the Supabase project named in `index.html` (search for `const SRV`).
