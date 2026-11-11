@@ -4,7 +4,7 @@
 
 An 8-bit trivia game about plant transport (roots, xylem, phloem, transpiration) for lower secondary students.
 
-**Play:** https://schoolprojects.my.id/
+**Play:** https://transquest.schoolprojects.my.id/
 
 ## Modes (the teacher chooses)
 - **One screen** - everyone plays on the teacher's screen.
