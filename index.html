@@ -906,7 +906,7 @@ $("goHost").addEventListener("click",()=>{ Audio8.init(); sfx.select(); show("sc
 $("goJoin").addEventListener("click",()=>{ Audio8.init(); Audio8.stopMusic(); sfx.select(); show("screen-join"); $("codeIn").focus(); if(!C.conn) ensurePeer(); });
 
 /* ================= TEACHER (HOST) ================= */
-const S={mode:"team",size:2,phase:"setup",teams:[],turn:0,ans:0,used:0,round:1,rounds:2,secs:300,qorder:[],board:[],cur:null,paused:false,stealLeft:0,log:[],code:"",peer:null,relay:null,clients:new Map()};
+const S={mode:"team",size:2,phase:"setup",teams:[],turn:0,ans:0,used:0,round:1,rounds:2,secs:300,qorder:[],board:[],cur:null,paused:false,stealLeft:0,log:[],code:"",peer:null,relay:null,clients:new Map(),remote:false};
 const isDevices=()=>S.mode!=="local";
 
 /* ---------- setup ---------- */
@@ -962,7 +962,8 @@ $("setup").addEventListener("submit",e=>{
     const name=clean($("tn"+i).value,14)||("TEAM "+(i+1));
     S.teams.push(newTeam(name,S.mode==="local"?Array.from({length:S.size},(_,k)=>clean($("p"+i+"_"+k).value,12)):[],i));
   }
-  if(S.mode==="local") startGame(); else openRoom();
+  srvStop();
+  if(S.mode==="local") startGame(); else if(SRV.host) srvOpenRoom(); else openRoom();
 });
 
 /* ---------- networking (PeerJS: the teacher's browser is the game server) ---------- */
@@ -1068,6 +1069,7 @@ function onClientClose(conn){
 }
 
 function kick(cid){
+  if(S.remote) return hostAct("kick",{cid});
   const c=S.clients.get(cid); if(!c) return;
   send(c.conn,{t:"kicked"});
   setTimeout(()=>{try{c.conn.close()}catch(e){}},300);
@@ -1103,11 +1105,13 @@ function renderLobby(){
 }
 $("lobbyList").addEventListener("click",e=>{ const b=e.target.closest(".kick"); if(b) kick(b.dataset.cid); });
 $("lobbyCancel").addEventListener("click",()=>{
+  if(S.remote) srvClose("The teacher closed the game.");
   S.clients.forEach(c=>send(c.conn,{t:"kicked",msg:"The teacher closed the game."}));
   closeRoomLinks();
   S.phase="setup"; show("screen-setup");
 });
 $("lobbyStart").addEventListener("click",()=>{
+  if(S.remote) return hostAct("start");
   if(S.mode==="student"){
     // drop empty teams and re-number
     const keep=S.teams.map((t,i)=>membersOf(i).length?i:-1).filter(i=>i>=0);
@@ -1126,16 +1130,19 @@ function startGame(){
     qorder:TOPICS.map(t=>t.levels.map(()=>Math.random()<.5?[0,1]:[1,0]))});
   S.ans=S.turn; resetBoard();
   S.phase="board";
+  enterGameUI();
+  addLog("Game started with "+S.teams.length+" teams");
+  renderAll(); broadcast();
+  toast(S.teams[S.turn].name+" GOES FIRST!");
+  last=performance.now();
+}
+function enterGameUI(){
   show("screen-game");
   $("monitor").hidden=!isDevices(); $("skipBtn").hidden=!isDevices(); $("codeChip").hidden=!isDevices();
   $("board").classList.toggle("readonly",isDevices());
   $("opts").classList.toggle("readonly",isDevices());
   buildScoreboard();
   Audio8.setThinking(false); Audio8.startMusic(); sfx.select();
-  addLog("Game started with "+S.teams.length+" teams");
-  renderAll(); broadcast();
-  toast(S.teams[S.turn].name+" GOES FIRST!");
-  last=performance.now();
 }
 function resetBoard(){ S.board=Array.from({length:25},()=>({s:"open",by:null,label:"",color:""})); S.used=0; }
 
@@ -1228,16 +1235,21 @@ function skipTurn(){
   if(advanceTurn()){ S.ans=S.turn; addLog("Teacher skipped "+from+"'s turn"); sfx.select(); renderAll(); broadcast(); }
 }
 function endGame(){
-  S.phase="end"; S.paused=false; $("pauseModal").hidden=true;
+  S.phase="end"; S.paused=false;
+  showEndUI(); broadcast();
+  addLog("Game over");
+}
+function showEndUI(){
+  $("pauseModal").hidden=true;
   Audio8.stopMusic(); sfx.fanfare();
   const r=rankOf(S.teams), tie=r.length>1&&r[1].t.score===r[0].t.score;
   $("winTitle").textContent=tie?"IT'S A DRAW!":r[0].t.name+" WINS!";
   $("winSub").textContent=tie?"JOINT CHAMPIONS OF THE TRANSPORT SYSTEM":"TOP OF THE TRANSPORT SYSTEM";
   $("final").innerHTML=r.map(x=>{const p=playersOf(x.t);return '<li style="--tc:'+x.t.color+'"><span class="pos">'+x.pos+'</span><span class="nm">'+esc(x.t.name)+'<small>'+esc((p?p+" · ":"")+x.t.right+" correct · "+x.t.steals+" stolen")+'</small></span><span class="pts">'+x.t.score+'</span></li>'}).join("");
-  drawTrophy(); show("screen-end"); World.celebrate(); broadcast();
-  addLog("Game over");
+  drawTrophy(); show("screen-end"); World.celebrate();
 }
 $("againBtn").addEventListener("click",()=>{
+  if(S.remote) srvClose("The teacher started a new game. Join again with the new code.");
   S.clients.forEach(c=>send(c.conn,{t:"kicked",msg:"The teacher started a new game. Join again with the new code."}));
   closeRoomLinks();
   S.phase="setup"; show("screen-setup");
@@ -1364,7 +1376,7 @@ function renderStage(){
       }
       const no=document.createElement("button"); no.type="button"; no.className="nosteal";
       no.textContent=isDevices()?"CLOSE STEAL - SHOW ANSWER":"NO STEAL - SHOW ANSWER";
-      no.addEventListener("click",()=>{ if(S.phase==="steal") finish(null); });
+      no.addEventListener("click",()=>{ if(S.phase!=="steal") return; if(S.remote) hostAct("nosteal"); else finish(null); });
       box.appendChild(no);
       if(!isDevices()) box.firstChild.focus();
     }
@@ -1380,7 +1392,7 @@ function renderStage(){
     if(document.activeElement!==$("nextBtn")) $("nextBtn").focus();
   }
 }
-$("nextBtn").addEventListener("click",nextTurn);
+$("nextBtn").addEventListener("click",()=>{ if(S.remote) hostAct("next"); else nextTurn(); });
 
 function renderMonitor(){
   if(!isDevices()||S.phase==="setup"||S.phase==="lobby") return;
@@ -1401,13 +1413,14 @@ function setPause(p){
   if(["setup","lobby","end"].includes(S.phase)) return;
   S.paused=p; $("pauseModal").hidden=!p; p?Audio8.stopMusic():Audio8.startMusic();
   if(p) $("resumeBtn").focus();
+  if(S.remote){ hostAct("pause",{on:p}); return; }
   addLog(p?"Teacher paused the game":"Game resumed");
   last=performance.now(); broadcast();
 }
 $("pauseBtn").addEventListener("click",()=>setPause(true));
 $("resumeBtn").addEventListener("click",()=>setPause(false));
 $("quitBtn").addEventListener("click",endGame);
-$("skipBtn").addEventListener("click",skipTurn);
+$("skipBtn").addEventListener("click",()=>{ if(S.remote) hostAct("skip"); else skipTurn(); });
 function syncMusicBtns(){ const on=Audio8.isMusicOn();
   $("musicBtn").textContent="MUSIC "+(on?"ON":"OFF"); $("musicBtn").setAttribute("aria-pressed",on);
   $("homeMusicBtn").innerHTML="&#9835; MUSIC "+(on?"ON":"OFF"); $("homeMusicBtn").setAttribute("aria-pressed",on); }
@@ -1437,6 +1450,12 @@ let last=performance.now(), bcastAcc=0;
 setInterval(()=>{
   const now=performance.now(), dt=(now-last)/1000; last=now;
   if(S.paused) return;
+  if(S.remote){
+    if(S.phase==="steal") S.stealLeft=Math.max(0,S.stealLeft-dt);
+    else if(S.phase==="board"||S.phase==="question"){ const t=S.teams[activeTeam()]; if(t&&!t.out) t.time=Math.max(0,t.time-dt); }
+    else return;
+    return renderHUD();
+  }
   if(S.phase==="steal"&&isDevices()){
     S.stealLeft=Math.max(0,S.stealLeft-dt); renderHUD();
     bcastAcc+=dt; if(bcastAcc>=.5){bcastAcc=0;broadcast();}
@@ -1451,6 +1470,141 @@ setInterval(()=>{
   bcastAcc+=dt; if(bcastAcc>=.5){ bcastAcc=0; broadcast(); if(isDevices()) renderMonitor(); }
   if(t.time===0) onTimeOut(i);
 },100);
+
+/* ================= SERVER HOSTING =================
+   Opened with ?server in the address, the teacher's page creates the game on a database
+   (supabase/setup.sql) instead of running it in this browser. The engine above is then not
+   used for device games: the server keeps the board, clocks and answers, this screen shows
+   what the server reports and sends the teacher's buttons to it, and student devices ask
+   the server about once a second. Without ?server, everything works as before. */
+const SRV={url:"https://bacszzkyyomjqsybvxho.supabase.co", key:"sb_publishable_Jkl6mf8QzjpsCJ2GYxifJA_fekNmG-j",
+  host:new URLSearchParams(location.search).has("server"), token:"", poll:null, busy:false, fails:0, look:{}, armed:""};
+function rpc(fn,args){
+  const h={apikey:SRV.key,"Content-Type":"application/json"};
+  if(!/^sb_/.test(SRV.key)) h.Authorization="Bearer "+SRV.key;
+  return fetch(SRV.url+"/rest/v1/rpc/"+fn,{method:"POST",headers:h,body:JSON.stringify(args)}).then(r=>{ if(!r.ok) throw new Error("server "+r.status); return r.json(); });
+}
+
+/* ---------- teacher side ---------- */
+function srvBank(){ // one question per board cell and round, picked the same way startGame does
+  const ord=TOPICS.map(t=>t.levels.map(()=>Math.random()<.5?[0,1]:[1,0]));
+  return Array.from({length:S.rounds},(_,r)=>Array.from({length:25},(_,idx)=>{
+    const ti=idx%5, li=Math.floor(idx/5), q=TOPICS[ti].levels[li][ord[ti][li][r]];
+    return q.f?{q:q.q,f:q.f,e:q.e}:{q:q.q,a:q.a,e:q.e};
+  }));
+}
+function srvRoomUI(){
+  show("screen-lobby");
+  $("lobbyErr").textContent=""; $("qr").innerHTML="";
+  $("lobbyHelp").textContent=S.mode==="team"?"Each team joins on ONE device.":"Every student joins on their own device and taps a team.";
+  const url=location.origin+location.pathname+"?code="+S.code;
+  $("bigCode").textContent=S.code||"------"; $("joinUrl").textContent=S.code?location.host+location.pathname:"Connecting...";
+  $("codeChip").textContent="CODE "+S.code;
+  if(S.code&&typeof QRCode!=="undefined"){ try{ new QRCode($("qr"),{text:url,width:160,height:160,correctLevel:QRCode.CorrectLevel.M}); }catch(e){} }
+}
+function srvOpenRoom(){
+  S.phase="lobby"; S.remote=true; S.code=""; S.cur=null;
+  srvRoomUI(); renderLobby();
+  rpc("tq_create",{p:{mode:S.mode,size:S.size,secs:S.secs,rounds:S.rounds,teams:S.teams.map(t=>t.name),topics:TOPICS.map(t=>t.name),bank:srvBank()}})
+    .then(r=>{ if(!S.remote) return; S.code=r.code; SRV.token=r.token; store.set("tq-host",JSON.stringify(r)); srvRoomUI(); srvWatch(); })
+    .catch(()=>{ $("lobbyErr").textContent="Could not reach the game server. Check the internet connection, press CANCEL and try again."; });
+}
+function srvWatch(){ clearInterval(SRV.poll); SRV.fails=0; SRV.busy=false; SRV.sig=""; SRV.poll=setInterval(srvPoll,1000); srvPoll(); }
+function srvPoll(){
+  if(SRV.busy||!S.remote||!S.code) return; SRV.busy=true;
+  rpc("tq_host",{p_code:S.code,p_token:SRV.token})
+    .then(v=>{ SRV.busy=false; SRV.fails=0; srvApply(v); })
+    .catch(()=>{ SRV.busy=false; if(++SRV.fails===4) toast("CONNECTION PROBLEM. STILL TRYING..."); });
+}
+function hostAct(act,arg){
+  if(!S.remote||!S.code) return;
+  rpc("tq_hostact",{p_code:S.code,p_token:SRV.token,p_act:act,p_arg:arg||{}}).then(srvApply).catch(()=>toast("CONNECTION PROBLEM. TRY AGAIN."));
+}
+function srvStop(){ clearInterval(SRV.poll); SRV.poll=null; S.remote=false; }
+function srvClose(msg){
+  if(S.code) rpc("tq_hostact",{p_code:S.code,p_token:SRV.token,p_act:"close",p_arg:{msg}}).catch(()=>{});
+  store.set("tq-host",""); srvStop();
+}
+/* copy what the server reports into S, then draw it with the normal teacher rendering */
+function srvApply(v){
+  if(!S.remote||!v) return;
+  if(v.t!=="state"){ store.set("tq-host",""); srvStop(); if(S.phase!=="end"){ S.phase="setup"; show("screen-setup"); toast("THIS GAME HAS ENDED"); } return; }
+  const prev=S.phase, prevRound=S.round, old=S.cur, oldWrong=old?old.wrong.length:0, wasOut=S.teams.map(t=>t.out);
+  // nothing but the clocks moved since the last report: leave the screen alone so taps are never lost
+  const sig=v.v+"|"+v.clients.map(c=>c.online?1:0).join(""), same=sig===SRV.sig; SRV.sig=sig;
+  Object.assign(S,{mode:v.mode,size:v.size,secs:v.secs,rounds:v.rounds,phase:v.phase,turn:v.turn,ans:v.ans,used:v.used,round:v.round,stealLeft:v.stealLeft,board:v.board});
+  S.teams=v.teams;
+  S.clients=new Map(v.clients.map(c=>[c.cid,Object.assign({conn:null},c)]));
+  S.log=v.log.map(l=>({tm:new Date(l.at*1000).toTimeString().slice(0,5),text:l.text}));
+  if(v.cur){ // keep the same object for the same question so the panel is not rebuilt every second
+    const key=v.round+"|"+v.cur.idx, c=old&&old.key===key?old:{key};
+    S.cur=Object.assign(c,v.cur,{q:{q:v.cur.q,e:v.cur.e}});
+  } else S.cur=null;
+  if(v.phase==="lobby"){ const shown=$("screen-lobby").classList.contains("active"); if(!shown) srvRoomUI(); if(!same||!shown) renderLobby(); return; }
+  if(v.phase==="end"){ clearInterval(SRV.poll); SRV.poll=null; if(prev!=="end") showEndUI(); return; }
+  const fresh=!$("screen-game").classList.contains("active");
+  if(same&&!fresh&&S.paused===v.paused) return renderHUD();
+  if(fresh){ enterGameUI(); if(prev==="lobby") toast(S.teams[S.turn].name+" GOES FIRST!"); }
+  if(S.paused!==v.paused){ S.paused=v.paused; $("pauseModal").hidden=!v.paused; v.paused?Audio8.stopMusic():Audio8.startMusic(); }
+  Audio8.setThinking(v.phase==="question");
+  if(!fresh){
+    if(v.round>prevRound){ sfx.fanfare(); toast("ROUND "+v.round+"! NEW QUESTIONS. "+S.teams[S.turn].name+" STARTS"); }
+    S.teams.forEach((t,i)=>{ if(t.out&&wasOut[i]===false){ sfx.timeup(); toast(t.name+" RAN OUT OF TIME!"); } });
+    if(S.cur&&S.cur===old&&S.cur.wrong.length>oldWrong){ sfx.wrong(); World.shake($("qpanel")); }
+    if(v.phase==="feedback"&&prev!=="feedback"&&S.cur.winner!=null){ sfx.correct(); World.confetti(); }
+    if(v.phase==="question"&&prev!=="question") sfx.select();
+  }
+  renderAll(); renderLog();
+}
+/* after a reload (or on another device with the same browser data) the teacher can pick the game up again */
+(function(){
+  if(!SRV.host) return;
+  let h=null; try{ h=JSON.parse(store.get("tq-host")||"null"); }catch(e){}
+  if(!h||!h.code||!h.token) return;
+  rpc("tq_host",{p_code:h.code,p_token:h.token}).then(v=>{
+    if(!v||v.t!=="state"||v.phase==="end") return store.set("tq-host","");
+    const b=document.createElement("button"); b.type="button"; b.className="btn-big"; b.id="resumeHost"; b.textContent="▶ RESUME GAME "+h.code;
+    $("goHost").insertAdjacentElement("afterend",b);
+    b.addEventListener("click",()=>{
+      Audio8.init(); Audio8.resume(); b.remove();
+      S.remote=true; S.code=h.code; SRV.token=h.token; S.phase="setup"; S.cur=null; S.teams=[]; S.paused=false;
+      srvWatch();
+    });
+  }).catch(()=>{});
+})();
+
+/* ---------- student side: looks like a connection to the rest of the code ---------- */
+function srvConn(code){
+  const k={open:true,srv:true,code,v:0,timer:null,busy:false,fails:0,helloed:false,
+    hello(){ if(!k.helloed){ k.helloed=true; k.send({t:"hello",cid:C.cid}); } },
+    send(m){
+      rpc("tq_msg",{p_code:code,p_cid:C.cid,p_msg:m}).then(rs=>{
+        if(!k.open) return;
+        if(!k.timer) k.timer=setInterval(k.poll,1000);
+        (Array.isArray(rs)?rs:[]).forEach(r=>onHostMsg(r.t==="nogame"?{t:"reject",msg:"That game has ended. Check the code on the teacher's screen."}:r));
+        k.poll();
+      }).catch(()=>{
+        if(m.t==="hello"){ k.helloed=false; joinErr("Couldn't reach the game server. Check your internet and try again."); }
+        else if(m.t==="join"){ $("joinErr2").textContent="Couldn't reach the game server. Try again."; $("joinTeamBtn").disabled=false; }
+        else { C.viewKey=""; if(C.state) renderClient(); } // let the team press again
+      });
+    },
+    poll(){
+      if(k.busy||!k.open) return; k.busy=true;
+      rpc("tq_poll",{p_code:code,p_cid:C.cid,p_v:k.v}).then(r=>{
+        k.busy=false; k.fails=0; if(!k.open||!r) return;
+        if(r.t==="state"){ k.v=r.v; onHostMsg(r); }
+        else if(r.t==="same"){
+          if(!C.state) return;
+          r.times.forEach((x,i)=>{ if(C.state.teams[i]) C.state.teams[i].time=x; }); C.state.stealLeft=r.stealLeft;
+          if(C.joined) renderClient(); // not while choosing a team: redrawing the buttons could swallow a tap
+        }
+        else if(r.t==="kicked"||r.t==="gone") onHostMsg({t:"kicked",msg:r.msg||(r.t==="gone"?"This game has ended.":"")});
+      }).catch(()=>{ k.busy=false; if(++k.fails===4&&C.joined) renderPlayMsg("LOST CONNECTION","Trying to reconnect to the game...",false); });
+    },
+    close(){ k.open=false; clearInterval(k.timer); k.timer=null; }};
+  return k;
+}
 
 /* ================= STUDENT DEVICE (CLIENT) ================= */
 const C={peer:null,conn:null,att:null,swap:null,code:"",mode:"",joined:false,state:null,you:-1,viewKey:"",retry:null,lastPhaseKey:""};
@@ -1554,6 +1708,17 @@ function startRelay(a){
   wireLink(a,"relay",conn);
 }
 function connectTo(code,armed){
+  if(armed) SRV.armed=code;
+  if(C.conn&&C.conn.srv&&C.conn.open&&C.conn.code===code){ if(armed) C.conn.hello(); return; }
+  if(!SRV.look[code]){
+    SRV.look[code]=rpc("tq_has",{p_code:code}).catch(()=>false);
+    SRV.look[code].then(has=>{
+      if(!has){ setTimeout(()=>{ delete SRV.look[code]; },3000); return; }
+      if(C.joined||(C.conn&&C.conn.srv&&C.conn.open)||$("codeIn").value!==code) return;
+      dropAttempt(); C.code=code; C.conn=srvConn(code);
+      if(SRV.armed===code) C.conn.hello();
+    });
+  }
   if(typeof Peer==="undefined"&&typeof mqtt==="undefined"){ if(armed) joinErr("Could not load the connection library. Check your internet and reload."); return; }
   let a=C.att;
   if(a&&!a.dead&&a.code===code&&!(a.conn&&!a.conn.open)){ // already connecting (or connected) to this game
